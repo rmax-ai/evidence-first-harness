@@ -44,12 +44,58 @@ def inspect(repo: str) -> None:
 @click.option("--spec", default=None, help="Path to a YAML task specification")
 def run(repo: str, patch_path: str | None, spec: str | None) -> None:
     """Run the evidence-first workflow on a repository."""
-    click.echo(f"Running evidence-first workflow on {repo}...")
+    import asyncio
+
+    from evidence_first_harness.workflows.session import SessionManager
+
+    click.echo(f"Evidence-First Harness — running on {repo}")
     if patch_path:
         click.echo(f"Evaluating patch: {patch_path}")
     if spec:
         click.echo(f"Using specification: {spec}")
-    click.echo("(Phase 1 — not yet implemented)")
+
+    manager = SessionManager(repo_path=repo)
+    result = asyncio.run(
+        manager.run(
+            task_description=spec or "Evaluate existing patch",
+            patch_path=patch_path,
+        )
+    )
+
+    click.echo(f"\nRun ID: {result['run_id']}")
+    click.echo(f"Decision: {result['decision']}")
+    click.echo(f"Repository: {result['repository']}")
+    click.echo(f"Base commit: {result.get('base_commit', 'unknown')[:8]}")
+
+    if result.get("bundle_path"):
+        click.echo(f"\nEvidence bundle: {result['bundle_path']}")
+    if result.get("errors"):
+        click.echo(f"\nErrors: {len(result['errors'])}")
+        for err in result["errors"][:5]:
+            click.echo(f"  - {err}")
+
+
+@main.command()
+@click.option("--run-id", required=True, help="Run ID to check status of")
+def status(run_id: str) -> None:
+    """Show the status of a run."""
+    from pathlib import Path
+
+    artifact_dir = Path(".artifacts") / run_id
+    bundle_path = artifact_dir / "evidence-bundle.json"
+
+    if bundle_path.exists():
+        import json
+
+        data = json.loads(bundle_path.read_text())
+        decision = data.get("decision", {}).get("decision", "unknown")
+        evidence_count = len(data.get("evidence", []))
+        click.echo(f"Run: {run_id}")
+        click.echo(f"Decision: {decision}")
+        click.echo(f"Evidence records: {evidence_count}")
+        click.echo(f"Bundle: {bundle_path}")
+    else:
+        click.echo(f"No evidence bundle found for run {run_id}")
 
 
 @main.command()
@@ -58,14 +104,6 @@ def resume(run_id: str) -> None:
     """Resume an interrupted run."""
     click.echo(f"Resuming run {run_id}...")
     click.echo("(Phase 2 — not yet implemented)")
-
-
-@main.command()
-@click.option("--run-id", required=True, help="Run ID to check status of")
-def status(run_id: str) -> None:
-    """Show the status of a run."""
-    click.echo(f"Status for run {run_id}:")
-    click.echo("(Phase 1 — not yet implemented)")
 
 
 @main.group()
