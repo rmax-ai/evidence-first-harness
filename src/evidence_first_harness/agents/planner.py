@@ -47,7 +47,7 @@ Include concrete file paths, symbol names, and line number estimates.
 """
 
 
-def create_planner_agent(model: str = "claude-fable-5") -> LlmAgent:
+def create_planner_agent(model: str = "claude-sonnet-5") -> LlmAgent:
     """Create the implementation planner agent."""
     return LlmAgent(
         name="planner_agent",

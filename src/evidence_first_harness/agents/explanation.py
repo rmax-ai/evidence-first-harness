@@ -42,7 +42,7 @@ Structure the report with:
 """
 
 
-def create_explanation_agent(model: str = "gemini-2.5-flash") -> LlmAgent:
+def create_explanation_agent(model: str = "gemini-3.5-flash") -> LlmAgent:
     """Create the evidence explanation agent."""
     return LlmAgent(
         name="explanation_agent",

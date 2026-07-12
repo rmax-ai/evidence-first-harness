@@ -49,7 +49,7 @@ Your output is advisory. Structure it as:
 """
 
 
-def create_adversarial_review_agent(model: str = "gemini-2.5-flash") -> LlmAgent:
+def create_adversarial_review_agent(model: str = "gemini-3.5-flash") -> LlmAgent:
     """Create the adversarial review agent."""
     return LlmAgent(
         name="adversarial_review_agent",

@@ -1,20 +1,18 @@
-# Model routing configuration for ADK agents
-# Four-provider balance: Google (native SDK), DeepSeek + OpenAI + Anthropic (LiteLLM)
-# Cheap non-frontier models for prototype validation
+# Model routing — four providers, cheapest viable models per role
+# Implementation model ≠ evaluator models
 
 models:
   specification:
-    provider: google
-    model: gemini-2.5-flash
-    sdk: native
-    temperature: 0.2
-    max_tokens: 2048
+    provider: anthropic
+    model: claude-opus-4-6
+    sdk: litellm
+    effort: medium
+    max_tokens: 4096
 
   planner:
     provider: anthropic
     model: claude-fable-5
     sdk: litellm
-    temperature: 0.3
     max_tokens: 4096
 
   implementation:
@@ -33,14 +31,14 @@ models:
 
   adversarial_review:
     provider: google
-    model: gemini-2.5-flash
+    model: gemini-3.5-flash
     sdk: native
     temperature: 0.4
     max_tokens: 4096
 
   explanation:
     provider: google
-    model: gemini-2.5-flash
+    model: gemini-3.5-flash
     sdk: native
     temperature: 0.1
     max_tokens: 2048

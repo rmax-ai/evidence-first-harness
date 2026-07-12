@@ -75,12 +75,12 @@ async def handle_compile_specification(
         from evidence_first_harness.agents.specification import SPECIFICATION_AGENT_PROMPT
 
         result = await call_agent(
-            model="gemini-2.5-flash",
+            model="claude-opus-4-6",
             system_prompt=SPECIFICATION_AGENT_PROMPT,
             user_prompt=task_description or "Analyze the repository and compile a specification.",
-            provider="google",
-            temperature=0.2,
-            max_tokens=2048,
+            provider="anthropic",
+            effort="medium",
+            max_tokens=4096,
         )
 
         if result.error:
@@ -168,11 +168,10 @@ async def handle_plan_implementation(
         from evidence_first_harness.agents.planner import PLANNER_AGENT_PROMPT
 
         result = await call_agent(
-            model="claude-fable-5",
+            model="claude-sonnet-5",
             system_prompt=PLANNER_AGENT_PROMPT,
             user_prompt=f"Repository: {state.repository_id}\nTask: inspect the codebase and propose a minimal implementation plan.",
             provider="anthropic",
-            temperature=0.3,
             max_tokens=4096,
         )
 

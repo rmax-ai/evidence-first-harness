@@ -82,6 +82,7 @@ async def call_agent(
     provider: str = "",
     temperature: float = 0.2,
     max_tokens: int = 4096,
+    effort: str | None = None,
 ) -> AgentCallResult:
     """Call an LLM and return the response.
 
@@ -120,6 +121,7 @@ async def call_agent(
                 provider=provider,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                effort=effort,
             )
     except Exception as e:
         duration_ms = (time.monotonic() - start) * 1000
@@ -242,6 +244,7 @@ def _call_litellm(
     provider: str,
     temperature: float,
     max_tokens: int,
+    effort: str | None = None,
 ) -> dict[str, Any]:
     """Synchronous LiteLLM call."""
     import litellm
@@ -264,7 +267,7 @@ def _call_litellm(
     ]
 
     try:
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
@@ -273,6 +276,12 @@ def _call_litellm(
         # Claude Fable 5 and newer Anthropic models don't support temperature
         if provider != "anthropic":
             kwargs["temperature"] = temperature
+
+        # Anthropic thinking/effort models pass effort via extra_body
+        if effort and provider == "anthropic":
+            kwargs["extra_body"] = {
+                "thinking": {"type": "enabled", "budget_tokens": min(4096, max_tokens)}
+            }
 
         response = litellm.completion(**kwargs)
     except Exception as e:
