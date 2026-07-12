@@ -29,7 +29,9 @@ from evidence_first_harness.workflows.nodes import (
     handle_load_repository,
     handle_plan_implementation,
     handle_reclassify_risk,
+    handle_run_adversarial_checks,
     handle_run_evidence_checks,
+    handle_run_independent_review,
 )
 from evidence_first_harness.workflows.state import WorkflowState
 
@@ -240,8 +242,13 @@ class SessionManager:
                 self._evidence_plan,
                 "behavioral",
             ),
-            "run_adversarial_checks": lambda: _return_success(),  # Phase 4
-            "run_independent_review": lambda: _return_success(),  # Phase 4
+            "run_adversarial_checks": lambda: handle_run_adversarial_checks(
+                self._state, worktree, self._evidence_records,
+                self._evidence_plan, self._policy, self._artifacts, self._provenance
+            ),
+            "run_independent_review": lambda: handle_run_independent_review(
+                self._state, self._artifacts, self._provenance
+            ),
             "assess_evidence_sufficiency": lambda: handle_assess_sufficiency(
                 self._state,
                 self._policy,

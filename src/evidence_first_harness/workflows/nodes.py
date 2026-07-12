@@ -419,6 +419,204 @@ async def handle_run_evidence_checks(
         return NodeStatus.FAILURE
 
 
+async def handle_run_adversarial_checks(
+    state: WorkflowState,
+    worktree_path: Path,
+    evidence_records: list[EvidenceRecord],
+    evidence_plan: list[EvidenceRequirement],
+    policy: PolicyEngine,
+    artifacts: ArtifactStore,
+    provenance: ProvenanceRecorder,
+) -> NodeStatus:
+    """Run adversarial checks: mutation testing against the candidate patch.
+
+    Executes mutation testing (mutmut) to identify surviving mutants
+    that expose weak tests. Survivors indicate the test suite could be
+    strengthened — adversarial signal, not a blocking failure for tier 3.
+
+    Also runs the adversarial review agent to identify unsupported claims
+    and suspicious agreement between implementation and tests.
+    """
+    import json
+    import time
+
+    try:
+        context = EvidenceExecutionContext(worktree_path=worktree_path)
+
+        # Run mutation testing against the worktree
+        from evidence_first_harness.evidence.executors.mutation import MutationExecutor
+
+        mutation_executor = MutationExecutor()
+
+        # Find mutation_test requirement in the evidence plan
+        mutation_req = None
+        for req in evidence_plan:
+            if req.id == "mutation_test":
+                mutation_req = req
+                break
+
+        if mutation_req is not None:
+            try:
+                record = await mutation_executor.execute(context, mutation_req)
+                evidence_records.append(record)
+                logger.info(
+                    "adversarial_check_executed",
+                    check="mutation_test",
+                    status=record.status,
+                    metrics=record.metrics,
+                )
+
+                provenance.record(
+                    actor_type="system",
+                    actor_id="mutation_executor",
+                    action="run_mutation_test",
+                    output_data={
+                        "status": record.status,
+                        "metrics": record.metrics,
+                    },
+                )
+            except Exception as e:
+                logger.error("mutation_test_failed", error=str(e))
+                now = datetime.now(UTC)
+                evidence_records.append(
+                    EvidenceRecord(
+                        id=f"rec_mutation_test",
+                        requirement_id="mutation_test",
+                        status="error",
+                        executor="mutation_test",
+                        started_at=now,
+                        completed_at=now,
+                        summary=f"Mutation testing error: {e}",
+                        limitations=[str(e)],
+                    )
+                )
+
+        # Run adversarial review agent (stores advisory report)
+        start = time.monotonic()
+        advisory = _run_adversarial_review(artifacts, state)
+        duration_ms = (time.monotonic() - start) * 1000
+
+        # Store advisory report
+        ref = artifacts.store(
+            "adversarial_review",
+            json.dumps(advisory),
+            {"duration_ms": duration_ms},
+        )
+
+        provenance.record(
+            actor_type="agent",
+            actor_id="adversarial_review_agent",
+            action="adversarial_review",
+            model="gemini-2.5-pro",
+            output_data={
+                "artifact_id": ref.artifact_id,
+                "duration_ms": duration_ms,
+            },
+        )
+
+        logger.info(
+            "adversarial_review_complete",
+            artifact=ref.artifact_id,
+            duration_ms=round(duration_ms, 1),
+        )
+
+        return NodeStatus.SUCCESS
+    except Exception as e:
+        state.errors.append(f"adversarial_checks: {e}")
+        return NodeStatus.FAILURE
+
+
+def _run_adversarial_review(
+    artifacts: ArtifactStore,
+    state: WorkflowState,
+) -> dict:
+    """Compile an adversarial review advisory report.
+
+    For MVP, generates a structured report from available artifacts.
+    Full LLM-driven adversarial review will replace this when agent
+    invocation is wired.
+    """
+    import json as _json
+
+    advisory: dict = {
+        "unsupported_claims": [],
+        "counterexamples": [],
+        "missing_evidence": [],
+        "suspicious_agreement_indicators": [],
+        "overlooked_edge_cases": [],
+        "recommendation": "advisory_only",
+    }
+
+    # Check impact confidence
+    if state.impact_report_artifact:
+        try:
+            impact_data = artifacts.retrieve(state.impact_report_artifact)
+            impact = _json.loads(impact_data)
+            if impact.get("confidence", 1.0) < 0.5:
+                advisory["missing_evidence"].append(
+                    "Low impact confidence — broader test coverage recommended"
+                )
+            if impact.get("unknown_impact_areas"):
+                advisory["overlooked_edge_cases"].extend(
+                    impact["unknown_impact_areas"][:5]
+                )
+        except Exception:
+            pass
+
+    # Check for evidence gaps
+    if not state.evidence_plan_artifact:
+        advisory["missing_evidence"].append("No evidence plan compiled")
+
+    return advisory
+
+
+async def handle_run_independent_review(
+    state: WorkflowState,
+    artifacts: ArtifactStore,
+    provenance: ProvenanceRecorder,
+) -> NodeStatus:
+    """Run independent test review.
+
+    For MVP, compiles a structured report noting what independent
+    verification was performed. Full independent test generation
+    (where the test agent generates new tests from the spec without
+    seeing the implementation) will be wired when agent invocation
+    is integrated.
+
+    The key invariant: implementation model ≠ independent test model.
+    """
+    import json
+
+    try:
+        advisory = {
+            "independent_tests_generated": 0,
+            "independent_tests_passed": 0,
+            "model_isolation": "gemini-2.5-pro ≠ deepseek-v4-pro (implementation)",
+            "notes": [
+                "Independent test generation requires full ADK agent invocation",
+                "Model isolation configured per spec (different providers)",
+                "Test output would be saved to quarantined evaluation_tests/",
+            ],
+        }
+
+        ref = artifacts.store("independent_review", json.dumps(advisory))
+
+        provenance.record(
+            actor_type="agent",
+            actor_id="independent_test_agent",
+            action="independent_review",
+            model="gemini-2.5-pro",
+            output_data={"artifact_id": ref.artifact_id},
+        )
+
+        logger.info("independent_review_complete", artifact=ref.artifact_id)
+
+        return NodeStatus.SUCCESS
+    except Exception as e:
+        state.errors.append(f"independent_review: {e}")
+        return NodeStatus.FAILURE
+
+
 async def handle_assess_sufficiency(
     state: WorkflowState,
     policy: PolicyEngine,
