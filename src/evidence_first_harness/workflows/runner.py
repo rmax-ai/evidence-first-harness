@@ -22,12 +22,12 @@ from evidence_first_harness.domain.evidence import (
     EvidenceRequirement,
 )
 from evidence_first_harness.domain.exceptions import EvidenceError
-from evidence_first_harness.domain.impact import ImpactReport
 from evidence_first_harness.domain.risk import RiskAssessment, RiskDimension
 from evidence_first_harness.domain.specification import CompiledSpecification
 from evidence_first_harness.evidence.bundle import BundleBuilder
 from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
 from evidence_first_harness.evidence.planner import EvidencePlanner
+from evidence_first_harness.impact.analyzer import ImpactAnalyzer
 from evidence_first_harness.policy.decision import DecisionEngine
 from evidence_first_harness.policy.engine import PolicyEngine
 from evidence_first_harness.repository.git import RepositoryManager
@@ -111,12 +111,15 @@ class EvidenceRunner:
             if risk is None:
                 risk = self._default_risk()
 
-            # Build impact report (placeholder in Phase 1)
-            impact = ImpactReport(
-                changed_files=list(
-                    {str(p.relative_to(worktree.path)) for p in worktree.path.rglob("*.py")}
-                )[:20],  # top-level approximation
-                confidence=0.5,  # low confidence without AST analysis (Phase 3)
+            # Build impact report using the real analyzer
+            analyzer = ImpactAnalyzer(Path(str(self._repo.repo_path)))
+            impact = analyzer.analyze(
+                changed_files=[
+                    str(p.relative_to(worktree.path))
+                    for p in worktree.path.rglob("*.py")
+                    if p.is_file()
+                ],
+                worktree_path=worktree.path,
             )
 
             # Compile evidence plan

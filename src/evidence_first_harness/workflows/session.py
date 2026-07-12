@@ -20,6 +20,7 @@ from evidence_first_harness.policy.engine import PolicyEngine
 from evidence_first_harness.repository.git import RepositoryManager
 from evidence_first_harness.workflows.graph import EvidenceGraph, NodeStatus
 from evidence_first_harness.workflows.nodes import (
+    handle_analyze_impact,
     handle_assess_sufficiency,
     handle_classify_initial_risk,
     handle_compile_evidence_plan,
@@ -28,6 +29,7 @@ from evidence_first_harness.workflows.nodes import (
     handle_generate_patch,
     handle_load_repository,
     handle_plan_implementation,
+    handle_reclassify_risk,
     handle_run_evidence_checks,
 )
 from evidence_first_harness.workflows.state import WorkflowState
@@ -218,8 +220,12 @@ class SessionManager:
             "generate_patch": lambda: handle_generate_patch(
                 self._state, worktree, self._artifacts, self._provenance
             ),
-            "analyze_impact": lambda: _return_success(),  # Phase 3
-            "reclassify_risk": lambda: _return_success(),  # Phase 3
+            "analyze_impact": lambda: handle_analyze_impact(
+                self._state, self._repo_path, worktree, self._artifacts, self._provenance
+            ),
+            "reclassify_risk": lambda: handle_reclassify_risk(
+                self._state, self._artifacts, self._provenance
+            ),
             "compile_evidence_plan": lambda: self._compile_and_store_plan(),
             "run_cheap_checks": lambda: handle_run_evidence_checks(
                 self._state, worktree, self._policy,
