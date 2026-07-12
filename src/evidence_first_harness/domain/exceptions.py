@@ -63,5 +63,9 @@ class WorkflowError(HarnessError):
     """ADK workflow routing or state transition error."""
 
 
+class RepositoryError(HarnessError):
+    """Repository or git operations failed."""
+
+
 class ApprovalError(HarnessError):
     """Human approval validation failed."""
