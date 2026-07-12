@@ -139,7 +139,7 @@ class SessionManager:
             repo.remove_worktree(worktree)
 
         # Collect results
-        decision_value = "unknown"
+        decision_value = self._state.final_decision
         bundle_path = ""
 
         if self._state.evidence_bundle_artifact:
@@ -159,6 +159,10 @@ class SessionManager:
             "repository": str(self._repo_path),
             "base_commit": self._state.base_commit,
             "errors": self._state.errors,
+            "agent_calls": self._state.agent_calls,
+            "total_input_tokens": self._state.total_input_tokens,
+            "total_output_tokens": self._state.total_output_tokens,
+            "total_cost_usd": self._state.total_cost_usd,
         }
 
         self._provenance.record(

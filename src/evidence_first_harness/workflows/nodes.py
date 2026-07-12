@@ -89,12 +89,26 @@ async def handle_compile_specification(
             spec_content = f"Task: {task_description}\nStatus: compiled (agent error: {result.error[:100]})"
         else:
             spec_content = result.text
+            from evidence_first_harness.workflows.state import AgentCallRecord, compute_cost
+
+            call_cost = compute_cost(result.model, result.input_tokens, result.output_tokens)
+            state.record_agent_call(
+                AgentCallRecord(
+                    agent="specification",
+                    model=result.model,
+                    input_tokens=result.input_tokens,
+                    output_tokens=result.output_tokens,
+                    duration_ms=round(result.duration_ms, 1),
+                    cost_usd=call_cost,
+                )
+            )
             logger.info(
                 "specification_agent_call",
                 model=result.model,
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 duration_ms=round(result.duration_ms, 1),
+                cost_usd=f"{call_cost:.6f}",
             )
 
         ref = artifacts.store("specification", spec_content, {"task": task_description, "model": result.model})
@@ -179,11 +193,38 @@ async def handle_plan_implementation(
         ref = artifacts.store("implementation_plan", plan_content, {"model": result.model})
         state.implementation_plan_artifact = ref.artifact_id
 
+        from evidence_first_harness.workflows.state import AgentCallRecord, compute_cost
+
+        call_cost = compute_cost(result.model, result.input_tokens, result.output_tokens)
+        state.record_agent_call(
+            AgentCallRecord(
+                agent="planner",
+                model=result.model,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                duration_ms=round(result.duration_ms, 1),
+                cost_usd=call_cost,
+            )
+        )
+        logger.info(
+            "planner_agent_call",
+            model=result.model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            duration_ms=round(result.duration_ms, 1),
+            cost_usd=f"{call_cost:.6f}",
+        )
+
         provenance.record(
             actor_type="agent",
             actor_id="planner_agent",
             action="plan_implementation",
-            model="gemini-2.5-flash",
+            model=result.model,
+            output_data={
+                "artifact_id": ref.artifact_id,
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+            },
         )
 
         return NodeStatus.SUCCESS
@@ -216,12 +257,38 @@ async def handle_generate_patch(
         ref = artifacts.store("patch", patch_content)
         state.patch_artifact = ref.artifact_id
 
+        from evidence_first_harness.workflows.state import AgentCallRecord, compute_cost
+
+        call_cost = compute_cost(result.model, result.input_tokens, result.output_tokens)
+        state.record_agent_call(
+            AgentCallRecord(
+                agent="implementation",
+                model=result.model,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                duration_ms=round(result.duration_ms, 1),
+                cost_usd=call_cost,
+            )
+        )
+        logger.info(
+            "implementation_agent_call",
+            model=result.model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            duration_ms=round(result.duration_ms, 1),
+            cost_usd=f"{call_cost:.6f}",
+        )
+
         provenance.record(
             actor_type="agent",
             actor_id="implementation_agent",
             action="generate_patch",
-            model="deepseek-v4-pro",
-            output_data={"artifact_id": ref.artifact_id},
+            model=result.model,
+            output_data={
+                "artifact_id": ref.artifact_id,
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+            },
         )
 
         return NodeStatus.SUCCESS
@@ -698,6 +765,8 @@ async def handle_assess_sufficiency(
         )
 
         # Map decision to node status
+        decision_value = result.decision.value
+        state.final_decision = decision_value
         decision_map = {
             "rejected": NodeStatus.REJECTED,
             "repair_required": NodeStatus.REPAIR_REQUIRED,

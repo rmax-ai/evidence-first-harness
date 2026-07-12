@@ -62,10 +62,30 @@ def run(repo: str, patch_path: str | None, spec: str | None) -> None:
         )
     )
 
-    click.echo(f"\nRun ID: {result['run_id']}")
+    click.echo(f"\\nRun ID: {result['run_id']}")
     click.echo(f"Decision: {result['decision']}")
     click.echo(f"Repository: {result['repository']}")
     click.echo(f"Base commit: {result.get('base_commit', 'unknown')[:8]}")
+
+    # Agent telemetry summary
+    agent_calls = result.get("agent_calls", [])
+    total_input = result.get("total_input_tokens", 0)
+    total_output = result.get("total_output_tokens", 0)
+    total_cost = result.get("total_cost_usd", 0.0)
+    if agent_calls:
+        click.echo(f"\n│ {'Agent':<18} {'Model':<22} {'In':>6} {'Out':>6} {'Cost (USD)':>10} │")
+        click.echo(f"├{'─'*18}┼{'─'*22}┼{'─'*6}┼{'─'*6}┼{'─'*10}┤")
+        for call in agent_calls:
+            click.echo(
+                f"│ {call['agent']:<18} {call['model']:<22} "
+                f"{call['input_tokens']:>6} {call['output_tokens']:>6} "
+                f"${call['cost_usd']:>9.6f} │"
+            )
+        click.echo(f"├{'─'*18}┼{'─'*22}┼{'─'*6}┼{'─'*6}┼{'─'*10}┤")
+        click.echo(
+            f"│ {'TOTAL':<18} {'':<22} {total_input:>6} {total_output:>6} "
+            f"${total_cost:>9.6f} │"
+        )
 
     if result.get("bundle_path"):
         click.echo(f"\nEvidence bundle: {result['bundle_path']}")
