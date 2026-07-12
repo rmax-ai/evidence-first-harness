@@ -162,5 +162,98 @@ def benchmark_run(config_path: str) -> None:
     click.echo("(Phase 4 — not yet implemented)")
 
 
+@main.group()
+def github() -> None:
+    """GitHub integration — check runs, PR comments, artifacts."""
+    pass
+
+
+@github.command("check-run")
+@click.option("--owner", required=True, help="GitHub repository owner")
+@click.option("--repo", required=True, help="GitHub repository name")
+@click.option("--sha", "head_sha", required=True, help="Commit SHA to attach check to")
+@click.option("--run-id", required=True, help="EFH run ID to publish")
+@click.option("--conclusion", default="neutral",
+              type=click.Choice(["success", "failure", "neutral", "cancelled", "timed_out", "action_required"]))
+@click.option("--token", default=None, help="GitHub token (or use GITHUB_TOKEN env)")
+def github_check_run(
+    owner: str,
+    repo: str,
+    head_sha: str,
+    run_id: str,
+    conclusion: str,
+    token: str | None,
+) -> None:
+    """Publish an evidence bundle as a GitHub Check Run."""
+    from pathlib import Path
+
+    from evidence_first_harness.integrations.github import GitHubIntegration
+
+    bundle_path = Path(".artifacts") / run_id / "evidence-bundle.json"
+    if not bundle_path.exists():
+        click.echo(f"Error: No evidence bundle found for run {run_id}", err=True)
+        return
+
+    import json
+
+    evidence_data = json.loads(bundle_path.read_text())
+
+    integration = GitHubIntegration(owner=owner, repo=repo, token=token)
+    result = integration.create_check_run(
+        name="Evidence-First Harness",
+        head_sha=head_sha,
+        evidence_summary=evidence_data,
+        conclusion=conclusion,
+        external_id=run_id,
+    )
+
+    if result.error:
+        click.echo(f"Error: {result.error}", err=True)
+        return
+
+    click.echo(f"Check run created: {result.html_url}")
+    click.echo(f"  ID: {result.check_run_id}")
+    click.echo(f"  Conclusion: {result.conclusion}")
+    click.echo(f"  Annotations: {result.annotations_count}")
+
+
+@github.command("pr-comment")
+@click.option("--owner", required=True, help="GitHub repository owner")
+@click.option("--repo", required=True, help="GitHub repository name")
+@click.option("--pr", "pr_number", required=True, type=int, help="Pull request number")
+@click.option("--run-id", required=True, help="EFH run ID to summarize")
+@click.option("--token", default=None, help="GitHub token (or use GITHUB_TOKEN env)")
+def github_pr_comment(
+    owner: str,
+    repo: str,
+    pr_number: int,
+    run_id: str,
+    token: str | None,
+) -> None:
+    """Post an evidence summary as a PR comment."""
+    from pathlib import Path
+
+    from evidence_first_harness.integrations.github import GitHubIntegration
+
+    bundle_path = Path(".artifacts") / run_id / "evidence-bundle.json"
+    if not bundle_path.exists():
+        click.echo(f"Error: No evidence bundle found for run {run_id}", err=True)
+        return
+
+    import json
+
+    evidence_data = json.loads(bundle_path.read_text())
+
+    integration = GitHubIntegration(owner=owner, repo=repo, token=token)
+    result = integration.create_pr_comment(pr_number=pr_number, evidence_summary=evidence_data)
+
+    if result.get("error"):
+        click.echo(f"Error: {result['error']}", err=True)
+        return
+
+    comment_url = result.get("html_url", "unknown")
+    click.echo(f"PR comment posted: {comment_url}")
+
+
 if __name__ == "__main__":
     main()
