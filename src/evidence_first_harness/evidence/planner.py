@@ -63,10 +63,10 @@ class EvidencePlanner:
 
             plan.append(
                 EvidenceRequirement(
-                    id=f"evr_{check_id}_{self._short_id()}",
+                    id=check_id,  # Use policy check ID directly so decision engine matches
                     claim_ids=claim_ids or [],
                     evidence_type=check_id,
-                    executor=check_id,
+                    executor=self._policy.get_executor_map().get(check_id, check_id),
                     mandatory=True,
                     minimum_threshold=threshold,
                     independence_class=independence,

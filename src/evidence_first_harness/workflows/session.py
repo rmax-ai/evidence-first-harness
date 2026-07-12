@@ -13,7 +13,8 @@ import structlog
 
 from evidence_first_harness.artifacts.store import ArtifactStore
 from evidence_first_harness.callbacks.provenance import ProvenanceRecorder
-from evidence_first_harness.domain.evidence import EvidenceRecord
+from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
+from evidence_first_harness.domain.risk import RiskAssessment
 from evidence_first_harness.policy.decision import DecisionEngine
 from evidence_first_harness.policy.engine import PolicyEngine
 from evidence_first_harness.repository.git import RepositoryManager
@@ -59,6 +60,7 @@ class SessionManager:
         self._state = WorkflowState(run_id=self._run_id)
         self._graph = EvidenceGraph(self._state)
         self._evidence_records: list[EvidenceRecord] = []
+        self._evidence_plan: list[EvidenceRequirement] = []
         self._worktree_path: Path | None = None
 
     @property
@@ -218,14 +220,14 @@ class SessionManager:
             ),
             "analyze_impact": lambda: _return_success(),  # Phase 3
             "reclassify_risk": lambda: _return_success(),  # Phase 3
-            "compile_evidence_plan": lambda: handle_compile_evidence_plan(
-                self._state, self._policy, self._artifacts, self._provenance
-            ),
+            "compile_evidence_plan": lambda: self._compile_and_store_plan(),
             "run_cheap_checks": lambda: handle_run_evidence_checks(
-                self._state, worktree, self._policy, self._evidence_records, "cheap"
+                self._state, worktree, self._policy,
+                self._evidence_records, self._evidence_plan, "cheap"
             ),
             "run_behavioral_checks": lambda: handle_run_evidence_checks(
-                self._state, worktree, self._policy, self._evidence_records, "behavioral"
+                self._state, worktree, self._policy,
+                self._evidence_records, self._evidence_plan, "behavioral"
             ),
             "run_adversarial_checks": lambda: _return_success(),  # Phase 4
             "run_independent_review": lambda: _return_success(),  # Phase 4
@@ -269,6 +271,30 @@ class SessionManager:
             return NodeStatus.HUMAN_REVIEW_REQUIRED
 
         return NodeStatus.ELIGIBLE_FOR_AUTOMATION
+
+    async def _compile_and_store_plan(self) -> NodeStatus:
+        """Compile evidence plan and store it in memory for later dispatch."""
+        import json
+
+        status = await handle_compile_evidence_plan(
+            self._state, self._policy, self._artifacts, self._provenance
+        )
+
+        try:
+            plan_data = self._artifacts.retrieve(self._state.evidence_plan_artifact)
+            plan_raw = json.loads(plan_data)
+            self._evidence_plan = [
+                EvidenceRequirement.model_validate(r) for r in plan_raw
+            ]
+            logger.info(
+                "evidence_plan_loaded",
+                count=len(self._evidence_plan),
+                checks=[r.id for r in self._evidence_plan],
+            )
+        except Exception as e:
+            logger.error("evidence_plan_load_failed", error=str(e))
+
+        return status
 
 
 async def _return_success() -> NodeStatus:

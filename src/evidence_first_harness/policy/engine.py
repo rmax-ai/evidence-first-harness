@@ -65,6 +65,10 @@ class PolicyEngine:
         }
         return {**defaults, **self._raw.get("retry_policy", {})}
 
+    def get_executor_map(self) -> dict[str, str]:
+        """Return the mapping from policy check IDs to executor names."""
+        return dict(self._raw.get("executor_map", {}))
+
     def get_execution_order(self) -> list[str]:
         """Return ordered list of evidence check IDs (cheapest first)."""
         return list(self._raw.get("execution_order", []))

@@ -26,7 +26,7 @@ from evidence_first_harness.agents.planner import create_planner_agent
 from evidence_first_harness.agents.specification import create_specification_agent
 from evidence_first_harness.artifacts.store import ArtifactStore
 from evidence_first_harness.callbacks.provenance import ProvenanceRecorder
-from evidence_first_harness.domain.evidence import EvidenceRecord
+from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
 from evidence_first_harness.domain.risk import RiskAssessment
 from evidence_first_harness.evidence.bundle import BundleBuilder
 from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
@@ -232,48 +232,65 @@ async def handle_run_evidence_checks(
     worktree_path: Path,
     policy: PolicyEngine,
     evidence_records: list[EvidenceRecord],
+    evidence_plan: list[EvidenceRequirement],
     phase: str = "cheap",
 ) -> NodeStatus:
-    """Run a batch of evidence checks.
+    """Run a batch of evidence checks from the compiled evidence plan.
 
     Args:
         phase: "cheap" for initial checks, "behavioral" for deeper checks.
     """
     try:
-        # In production, this dispatches to the EvidenceRunner orchestrator
-        # For now, run what we can deterministically
         context = EvidenceExecutionContext(worktree_path=worktree_path)
 
-        # Discover and run executors
+        # Discover available executors
         from evidence_first_harness.workflows.runner import EvidenceRunner
 
-        runner = EvidenceRunner.__new__(EvidenceRunner)  # Skip init
+        runner = EvidenceRunner.__new__(EvidenceRunner)
         executors = runner._discover_executors()
-        executor_map = {e.name: e for e in executors}
+        executor_map: dict[str, Any] = {e.name: e for e in executors}
 
-        # Run the executors that match this phase
-        cheap_executors = {"ruff", "pyright", "git_validation", "formatting"}
-        behavioral_executors = {"pytest", "coverage", "semgrep"}
+        # Phase determines which checks to run (by policy check ID prefix)
+        cheap_ids = {"formatting", "lint", "type_check", "git_validation", "secret_scan"}
+        behavioral_ids = {"targeted_tests", "integration_tests", "security_scan", "coverage"}
 
-        target = cheap_executors if phase == "cheap" else behavioral_executors
+        target_ids = cheap_ids if phase == "cheap" else behavioral_ids
 
-        for ex in executors:
-            if ex.name in target:
-                from evidence_first_harness.domain.evidence import EvidenceRequirement
+        for requirement in evidence_plan:
+            if requirement.id not in target_ids:
+                continue
 
-                req = EvidenceRequirement(
-                    id=f"evr_{ex.name}",
-                    evidence_type=ex.name,
-                    executor=ex.name,
-                    mandatory=True,
-                    independence_class="deterministic",
-                    failure_action="reject" if phase == "cheap" else "repair",
+            executor_name = requirement.executor
+            executor = executor_map.get(executor_name)
+
+            if executor is None:
+                logger.warning("executor_not_found", executor=executor_name, check=requirement.id)
+                continue
+
+            try:
+                record = await executor.execute(context, requirement)
+                evidence_records.append(record)
+                logger.info(
+                    "evidence_executed",
+                    check=requirement.id,
+                    executor=executor_name,
+                    status=record.status,
                 )
-                try:
-                    record = await ex.execute(context, req)
-                    evidence_records.append(record)
-                except Exception as e:
-                    logger.error("executor_failed", executor=ex.name, error=str(e))
+            except Exception as e:
+                logger.error("executor_failed", executor=executor_name, error=str(e))
+                now = datetime.now(UTC)
+                evidence_records.append(
+                    EvidenceRecord(
+                        id=f"rec_{requirement.id}",
+                        requirement_id=requirement.id,
+                        status="error",
+                        executor=executor_name,
+                        started_at=now,
+                        completed_at=now,
+                        summary=f"Execution error: {e}",
+                        limitations=[str(e)],
+                    )
+                )
 
         return NodeStatus.SUCCESS
     except Exception as e:

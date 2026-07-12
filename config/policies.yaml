@@ -65,10 +65,26 @@ execution_order:
   - targeted_tests
   - integration_tests
   - security_scan
+  - secret_scan
   - dependency_scan
   - mutation_test
+  - coverage
   - performance_check
   - rollback_check
+
+# Map policy check IDs to executor names (one executor may serve multiple checks)
+executor_map:
+  formatting: ruff
+  lint: ruff
+  type_check: pyright
+  targeted_tests: pytest
+  integration_tests: pytest
+  security_scan: semgrep
+  secret_scan: secrets
+  dependency_scan: dependency
+  mutation_test: mutation_test
+  coverage: coverage
+  git_validation: git_validation
 
 # Bounded retry policy
 retry_policy:
