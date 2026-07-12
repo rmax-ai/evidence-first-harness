@@ -277,11 +277,22 @@ def _call_litellm(
         if provider != "anthropic":
             kwargs["temperature"] = temperature
 
-        # Anthropic thinking/effort models pass effort via extra_body
+        # Anthropic adaptive thinking
+        # Models that support effort in adaptive thinking:
+        #   claude-fable-5, claude-mythos-5, claude-opus-4-8, claude-opus-4-7, claude-sonnet-5
+        # Models that only support type:adaptive (no effort):
+        #   claude-opus-4-6, claude-sonnet-4-6
         if effort and provider == "anthropic":
-            kwargs["extra_body"] = {
-                "thinking": {"type": "enabled", "budget_tokens": min(4096, max_tokens)}
+            effort_models = {
+                "claude-fable-5", "claude-mythos-5",
+                "claude-opus-4-8", "claude-opus-4-7",
+                "claude-sonnet-5",
             }
+            base = model.split("/")[-1]  # strip litellm prefix like "anthropic/"
+            if base in effort_models:
+                kwargs["thinking"] = {"type": "adaptive", "effort": effort}
+            else:
+                kwargs["thinking"] = {"type": "adaptive"}
 
         response = litellm.completion(**kwargs)
     except Exception as e:
