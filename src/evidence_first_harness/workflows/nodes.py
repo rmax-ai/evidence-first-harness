@@ -71,22 +71,48 @@ async def handle_compile_specification(
 ) -> NodeStatus:
     """Run the specification agent to compile requirements."""
     try:
-        agent = create_specification_agent()
-        # In practice, ADK would manage session context
-        # For now, store a placeholder
-        spec_content = f"Task: {task_description}\nStatus: compiled"
-        ref = artifacts.store("specification", spec_content, {"task": task_description})
+        from evidence_first_harness.agents.invoker import call_agent
+        from evidence_first_harness.agents.specification import SPECIFICATION_AGENT_PROMPT
+
+        result = await call_agent(
+            model="gemini-2.5-flash",
+            system_prompt=SPECIFICATION_AGENT_PROMPT,
+            user_prompt=task_description or "Analyze the repository and compile a specification.",
+            provider="google",
+            temperature=0.2,
+            max_tokens=2048,
+        )
+
+        if result.error:
+            logger.warning("specification_agent_error", error=result.error)
+            # Fall back to placeholder on error
+            spec_content = f"Task: {task_description}\nStatus: compiled (agent error: {result.error[:100]})"
+        else:
+            spec_content = result.text
+            logger.info(
+                "specification_agent_call",
+                model=result.model,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                duration_ms=round(result.duration_ms, 1),
+            )
+
+        ref = artifacts.store("specification", spec_content, {"task": task_description, "model": result.model})
         state.specification_artifact = ref.artifact_id
 
         provenance.record(
             actor_type="agent",
             actor_id="specification_agent",
             action="compile_specification",
-            model="gemini-2.5-flash",
-            output_data={"artifact_id": ref.artifact_id},
+            model=result.model,
+            output_data={
+                "artifact_id": ref.artifact_id,
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+            },
         )
 
-        logger.info("specification_compiled", artifact=ref.artifact_id)
+        logger.info("specification_compiled", artifact=ref.artifact_id, duration_ms=round(result.duration_ms, 1))
         return NodeStatus.SUCCESS
     except Exception as e:
         state.errors.append(f"specification: {e}")
@@ -138,9 +164,20 @@ async def handle_plan_implementation(
 ) -> NodeStatus:
     """Run the planner agent."""
     try:
-        agent = create_planner_agent()
-        plan_content = "Implementation plan placeholder"
-        ref = artifacts.store("implementation_plan", plan_content)
+        from evidence_first_harness.agents.invoker import call_agent
+        from evidence_first_harness.agents.planner import PLANNER_AGENT_PROMPT
+
+        result = await call_agent(
+            model="claude-fable-5",
+            system_prompt=PLANNER_AGENT_PROMPT,
+            user_prompt=f"Repository: {state.repository_id}\nTask: inspect the codebase and propose a minimal implementation plan.",
+            provider="anthropic",
+            temperature=0.3,
+            max_tokens=4096,
+        )
+
+        plan_content = result.text if not result.error else f"Implementation plan (agent error: {result.error[:100]})"
+        ref = artifacts.store("implementation_plan", plan_content, {"model": result.model})
         state.implementation_plan_artifact = ref.artifact_id
 
         provenance.record(
@@ -164,9 +201,19 @@ async def handle_generate_patch(
 ) -> NodeStatus:
     """Run the implementation agent in the worktree."""
     try:
-        agent = create_implementation_agent()
-        # Placeholder — real implementation would use ADK session
-        patch_content = "# Generated patch placeholder"
+        from evidence_first_harness.agents.invoker import call_agent
+        from evidence_first_harness.agents.implementation import IMPLEMENTATION_AGENT_PROMPT
+
+        result = await call_agent(
+            model="deepseek-chat",
+            system_prompt=IMPLEMENTATION_AGENT_PROMPT,
+            user_prompt=f"Repository: {state.repository_id}\nWorktree: {worktree_path}\n\nImplement the planned change. Write clean, minimal code.",
+            provider="deepseek",
+            temperature=0.0,
+            max_tokens=8192,
+        )
+
+        patch_content = result.text if not result.error else f"# Generated patch (agent error: {result.error[:100]})"
         ref = artifacts.store("patch", patch_content)
         state.patch_artifact = ref.artifact_id
 

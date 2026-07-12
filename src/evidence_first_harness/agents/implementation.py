@@ -54,7 +54,7 @@ Include the patch content and any deviations from the plan.
 """
 
 
-def create_implementation_agent(model: str = "deepseek-v4-pro") -> LlmAgent:
+def create_implementation_agent(model: str = "deepseek-chat") -> LlmAgent:
     """Create the implementation agent.
 
     Uses DeepSeek by default (different model from spec/test agents

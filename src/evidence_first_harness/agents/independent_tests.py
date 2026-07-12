@@ -49,7 +49,7 @@ These tests must not automatically become permanent repository tests.
 """
 
 
-def create_independent_test_agent(model: str = "gemini-2.5-pro") -> LlmAgent:
+def create_independent_test_agent(model: str = "gpt-4o-mini") -> LlmAgent:
     """Create the independent test agent.
 
     Uses Gemini Pro by default — different model from implementation agent
