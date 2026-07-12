@@ -1,0 +1,94 @@
+# Evidence Policy — version-controlled, risk-adjusted evidence requirements
+# See docs/policy-guide.md for full documentation
+
+version: "1.0"
+
+tiers:
+  3:
+    description: "Low risk — eligible for automated acceptance after evidence sufficiency"
+    required:
+      - formatting
+      - lint
+      - type_check
+      - targeted_tests
+      - secret_scan
+    minimum:
+      test_pass_rate: 1.0
+      impact_confidence: 0.70
+    approval: []
+
+  2:
+    description: "Medium risk — human code owner review required before merge"
+    required:
+      - formatting
+      - lint
+      - type_check
+      - targeted_tests
+      - integration_tests
+      - security_scan
+      - mutation_test
+    minimum:
+      test_pass_rate: 1.0
+      mutation_score: 0.70
+      impact_confidence: 0.80
+    approval:
+      - code_owner
+
+  1:
+    description: "High risk — specialist approval required"
+    required:
+      - formatting
+      - lint
+      - type_check
+      - targeted_tests
+      - integration_tests
+      - contract_tests
+      - security_scan
+      - dependency_scan
+      - mutation_test
+      - performance_check
+      - rollback_check
+    minimum:
+      test_pass_rate: 1.0
+      mutation_score: 0.80
+      impact_confidence: 0.90
+    approval:
+      - code_owner
+      - security_owner
+
+# Execution ordering (by cost, cheap first)
+execution_order:
+  - git_validation
+  - formatting
+  - lint
+  - type_check
+  - targeted_tests
+  - integration_tests
+  - security_scan
+  - dependency_scan
+  - mutation_test
+  - performance_check
+  - rollback_check
+
+# Bounded retry policy
+retry_policy:
+  implementation_attempts: 3
+  evidence_repair_attempts: 2
+  tool_retry_attempts: 2
+  maximum_agent_turns: 20
+  maximum_total_runtime_minutes: 45
+
+# Override per repository path pattern (glob)
+# overrides:
+#   "src/payments/**":
+#     tiers:
+#       2:
+#         required:
+#           - formatting
+#           - lint
+#           - type_check
+#           - targeted_tests
+#           - integration_tests
+#           - security_scan
+#           - mutation_test
+#           - contract_tests  # additional for payments

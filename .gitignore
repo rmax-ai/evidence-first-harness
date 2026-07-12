@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.log
+
+# Ruff
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Handoff documents (transient)
+HANDOFF-*.md
+
+# Artifacts (runtime output)
+.artifacts/
+
+# Docker
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db

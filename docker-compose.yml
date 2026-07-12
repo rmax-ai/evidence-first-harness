@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - EFH_ARTIFACT_DIR=/artifacts
+      - EFH_SESSION_DB_PATH=/artifacts/sessions.db
+      - EFH_SANDBOX_TIMEOUT_SECONDS=300
+    volumes:
+      - artifacts:/artifacts
+      - /var/run/docker.sock:/var/run/docker.sock  # for sandbox containers
+    command: uv run uvicorn evidence_first_harness.api:app --host 0.0.0.0 --port 8000
+
+volumes:
+  artifacts:

@@ -1,0 +1,51 @@
+# Model routing configuration for ADK agents
+# Provider: google (native ADK), litellm (DeepSeek, Claude, etc.), ollama, vllm
+
+models:
+  specification:
+    provider: google
+    model: gemini-flash-latest
+    temperature: 0.2
+    max_tokens: 4096
+
+  planner:
+    provider: google
+    model: gemini-flash-latest
+    temperature: 0.3
+    max_tokens: 4096
+
+  implementation:
+    provider: litellm
+    model: deepseek/deepseek-chat
+    temperature: 0.0
+    max_tokens: 8192
+
+  independent_test:
+    provider: google
+    model: gemini-pro-latest
+    temperature: 0.5
+    max_tokens: 4096
+
+  adversarial_review:
+    provider: google
+    model: gemini-pro-latest
+    temperature: 0.4
+    max_tokens: 4096
+
+  explanation:
+    provider: google
+    model: gemini-flash-latest
+    temperature: 0.1
+    max_tokens: 2048
+
+# Default provider for tools/utilities
+default_provider: google
+
+# Maximum context budget per agent (tokens)
+context_budgets:
+  specification: 16000
+  planner: 16000
+  implementation: 32000
+  independent_test: 8000
+  adversarial_review: 16000
+  explanation: 16000

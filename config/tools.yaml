@@ -1,0 +1,66 @@
+# Tool allowlists and configuration for ADK agents
+# Tools are narrow, validated functions — no generic shell access
+
+tools:
+  common:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+
+  specification_agent:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+    - store_artifact
+
+  planner_agent:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+    - store_artifact
+
+  implementation_agent:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+    - apply_patch
+    - run_allowed_command
+    - get_test_selection
+    - store_artifact
+
+  independent_test_agent:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+    - run_allowed_command
+    - store_artifact
+
+  adversarial_review_agent:
+    - inspect_repository
+    - read_source_file
+    - search_symbols
+    - store_artifact
+
+  explanation_agent:
+    - store_artifact
+
+# Allowed commands per agent role (executed through validated command tool)
+allowed_commands:
+  implementation_agent:
+    - ruff_format
+    - ruff_check
+    - pytest_specific
+    - pytest_all
+    - git_diff
+    - git_status
+
+  independent_test_agent:
+    - pytest_specific
+    - pytest_all
+
+# Tool timeout defaults (seconds)
+tool_timeouts:
+  default: 30
+  run_allowed_command: 120
+  apply_patch: 15
+  store_artifact: 10
