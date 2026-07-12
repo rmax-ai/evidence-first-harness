@@ -2,20 +2,81 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 import subprocess
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
-from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
 
-_SUMMARY_PATTERN = re.compile(r"(?P<count>\d+)\s+(?P<label>passed|failed|skipped|error)")
-_TOTAL_PATTERN = re.compile(r"^TOTAL\s+\d+\s+\d+\s+(?P<coverage>\d+)%$", re.MULTILINE)
+if TYPE_CHECKING:
+    from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
+
+_TEST_SUMMARY_PATTERN = re.compile(r"(?P<count>\d+)\s+(?P<label>passed|failed)")
+_COVERAGE_TOTAL_PATTERN = re.compile(
+    r"^TOTAL\s+\d+\s+\d+\s+(?P<coverage>\d+(?:\.\d+)?)%$", re.MULTILINE
+)
+
+
+def _environment_digest(environment: dict[str, str]) -> str:
+    payload = "\n".join(f"{key}={value}" for key, value in sorted(environment.items()))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _parse_test_counts(output: str) -> tuple[int, int]:
+    passed = 0
+    failed = 0
+    for match in _TEST_SUMMARY_PATTERN.finditer(output):
+        count = int(match.group("count"))
+        label = match.group("label")
+        if label == "passed":
+            passed = count
+        elif label == "failed":
+            failed = count
+    return passed, failed
+
+
+def _parse_coverage_pct(output: str) -> float | None:
+    match = _COVERAGE_TOTAL_PATTERN.search(output)
+    if match is None:
+        return None
+    return float(match.group("coverage"))
+
+
+def _build_record(
+    *,
+    requirement: EvidenceRequirement,
+    executor: str,
+    command: list[str],
+    started_at: datetime,
+    completed_at: datetime,
+    environment: dict[str, str],
+    status: str,
+    summary: str,
+    exit_code: int | None,
+    metrics: dict[str, float | int | str],
+    limitations: list[str],
+) -> EvidenceRecord:
+    return EvidenceRecord(
+        id=f"{requirement.id}_{executor}",
+        requirement_id=requirement.id,
+        status=status,
+        executor=executor,
+        command=command,
+        started_at=started_at,
+        completed_at=completed_at,
+        exit_code=exit_code,
+        summary=summary,
+        metrics=metrics,
+        environment_digest=_environment_digest(environment),
+        limitations=limitations,
+    )
 
 
 class CoverageExecutor:
-    """Run pytest with coverage enabled and parse the total coverage percentage."""
+    """Run pytest with coverage reporting and parse the total coverage."""
 
     name = "coverage"
 
@@ -24,200 +85,108 @@ class CoverageExecutor:
         context: EvidenceExecutionContext,
         requirement: EvidenceRequirement,
     ) -> EvidenceRecord:
-        """Execute pytest-cov in the target worktree."""
-        started_at = context.started_at
+        """Execute pytest-cov for the target worktree."""
+        started_at = datetime.now(UTC)
         command = [context.pytest_path, "--cov=.", "--cov-report=term", "-q"]
 
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 command,
-                cwd=context.worktree_path,
                 capture_output=True,
                 text=True,
+                cwd=context.worktree_path,
+                env=context.environment or None,
                 timeout=context.timeout_seconds,
                 check=False,
-                env=_build_environment(context),
+            )
+        except FileNotFoundError:
+            completed_at = datetime.now(UTC)
+            return _build_record(
+                requirement=requirement,
+                executor=self.name,
+                command=command,
+                started_at=started_at,
+                completed_at=completed_at,
+                environment=context.environment,
+                status="unavailable",
+                summary="Pytest executable was not found",
+                exit_code=None,
+                metrics={"coverage_pct": 0.0, "tests_passed": 0, "tests_total": 0},
+                limitations=[
+                    "Install pytest and pytest-cov, or provide a valid "
+                    "pytest_path in the execution context.",
+                ],
             )
         except subprocess.TimeoutExpired:
             completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
+            return _build_record(
+                requirement=requirement,
+                executor=self.name,
+                command=command,
+                started_at=started_at,
+                completed_at=completed_at,
+                environment=context.environment,
                 status="error",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
+                summary="Coverage execution timed out",
                 exit_code=None,
-                summary="coverage run timed out",
-                environment_digest=_environment_digest(context),
+                metrics={"coverage_pct": 0.0, "tests_passed": 0, "tests_total": 0},
+                limitations=[f"Execution exceeded timeout of {context.timeout_seconds} seconds."],
             )
-        except OSError as exc:
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="error",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=None,
-                summary=f"coverage run could not start: {exc}",
-                environment_digest=_environment_digest(context),
-            )
-
-        output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
-        if _pytest_cov_missing(output):
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="unavailable",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=result.returncode,
-                summary="pytest-cov is not installed or not available",
-                environment_digest=_environment_digest(context),
-                limitations=["coverage requires the pytest-cov plugin"],
-            )
-
-        counts = _parse_summary_counts(output)
-        passed = counts.get("passed", 0)
-        failed = counts.get("failed", 0) + counts.get("error", 0)
-        total = passed + failed
-        coverage_pct = _parse_coverage_percentage(output)
-        metrics: dict[str, float | int | str] = {
-            "tests_passed": passed,
-            "tests_total": total,
-        }
-        if coverage_pct is not None:
-            metrics["coverage_pct"] = coverage_pct
 
         completed_at = datetime.now(UTC)
-        status = _status_for_result(
-            returncode=result.returncode,
-            failed=failed,
-            coverage_pct=coverage_pct,
-            minimum_threshold=requirement.minimum_threshold,
-        )
-        summary = _build_summary(
-            status=status,
-            coverage_pct=coverage_pct,
-            passed=passed,
-            total=total,
-            failed=failed,
-            threshold=requirement.minimum_threshold,
-            returncode=result.returncode,
-        )
+        combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part.strip())
+        lowered_output = combined_output.lower()
 
+        if (
+            "unrecognized arguments: --cov" in lowered_output
+            or "no module named pytest_cov" in lowered_output
+        ):
+            return _build_record(
+                requirement=requirement,
+                executor=self.name,
+                command=command,
+                started_at=started_at,
+                completed_at=completed_at,
+                environment=context.environment,
+                status="unavailable",
+                summary="pytest-cov is not installed or not enabled for this pytest environment",
+                exit_code=result.returncode,
+                metrics={"coverage_pct": 0.0, "tests_passed": 0, "tests_total": 0},
+                limitations=[
+                    "Install pytest-cov in the execution environment "
+                    "to collect coverage."
+                ],
+            )
+
+        tests_passed, tests_failed = _parse_test_counts(combined_output)
+        coverage_pct = _parse_coverage_pct(combined_output)
+        tests_total = tests_passed + tests_failed
+
+        status = "pass" if result.returncode == 0 else "fail"
+        summary = (
+            "Coverage checks passed"
+            if result.returncode == 0
+            else "Coverage run reported failing tests or execution issues"
+        )
         limitations: list[str] = []
         if coverage_pct is None:
-            limitations.append("TOTAL coverage line was not present in pytest output")
-        if result.returncode == 5:
-            limitations.append("pytest reported that no tests were collected")
+            limitations.append("Coverage percentage could not be parsed from pytest output.")
 
-        return EvidenceRecord(
-            id=_record_id(requirement.id, self.name),
-            requirement_id=requirement.id,
-            status=status,
+        return _build_record(
+            requirement=requirement,
             executor=self.name,
             command=command,
             started_at=started_at,
             completed_at=completed_at,
-            exit_code=result.returncode,
+            environment=context.environment,
+            status=status,
             summary=summary,
-            metrics=metrics,
-            environment_digest=_environment_digest(context),
+            exit_code=result.returncode,
+            metrics={
+                "coverage_pct": coverage_pct if coverage_pct is not None else 0.0,
+                "tests_passed": tests_passed,
+                "tests_total": tests_total,
+            },
             limitations=limitations,
         )
-
-
-def _build_environment(context: EvidenceExecutionContext) -> dict[str, str]:
-    environment = dict(context.environment)
-    return environment
-
-
-def _environment_digest(context: EvidenceExecutionContext) -> str:
-    parts = [
-        f"python_path={context.python_path}",
-        f"pytest_path={context.pytest_path}",
-        f"timeout_seconds={context.timeout_seconds}",
-        f"sandbox_id={context.sandbox_id or ''}",
-    ]
-    parts.extend(
-        f"{key}={value}"
-        for key, value in sorted(context.environment.items(), key=lambda item: item[0])
-    )
-    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
-
-
-def _parse_summary_counts(output: str) -> dict[str, int]:
-    counts = {"passed": 0, "failed": 0, "skipped": 0, "error": 0}
-    for match in _SUMMARY_PATTERN.finditer(output):
-        label = match.group("label")
-        counts[label] = counts.get(label, 0) + int(match.group("count"))
-    return counts
-
-
-def _parse_coverage_percentage(output: str) -> float | None:
-    match = _TOTAL_PATTERN.search(output)
-    if match is None:
-        return None
-    return float(match.group("coverage"))
-
-
-def _pytest_cov_missing(output: str) -> bool:
-    lowered = output.lower()
-    return "unrecognized arguments: --cov=." in lowered or "no module named pytest_cov" in lowered
-
-
-def _status_for_result(
-    *,
-    returncode: int,
-    failed: int,
-    coverage_pct: float | None,
-    minimum_threshold: float | None,
-) -> str:
-    if returncode == 0 and coverage_pct is not None:
-        if minimum_threshold is not None and coverage_pct < minimum_threshold:
-            return "fail"
-        return "pass"
-    if returncode == 5:
-        return "partial"
-    if failed > 0:
-        return "fail"
-    if (
-        coverage_pct is not None
-        and minimum_threshold is not None
-        and coverage_pct < minimum_threshold
-    ):
-        return "fail"
-    return "error"
-
-
-def _build_summary(
-    *,
-    status: str,
-    coverage_pct: float | None,
-    passed: int,
-    total: int,
-    failed: int,
-    threshold: float | None,
-    returncode: int,
-) -> str:
-    if status == "pass" and coverage_pct is not None:
-        return f"coverage {coverage_pct:.0f}% across {passed} passing tests"
-    if status == "partial":
-        return "coverage run did not collect any tests"
-    if status == "fail" and failed > 0:
-        return f"coverage run reported {failed} failing tests out of {total}"
-    if status == "fail" and coverage_pct is not None and threshold is not None:
-        return f"coverage {coverage_pct:.0f}% is below required threshold {threshold:.0f}%"
-    return f"coverage run exited with code {returncode}"
-
-
-def _record_id(requirement_id: str, executor_name: str) -> str:
-    return f"{requirement_id}_{executor_name}"

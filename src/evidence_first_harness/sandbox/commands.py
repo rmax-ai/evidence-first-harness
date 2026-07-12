@@ -324,6 +324,23 @@ def _default_rules() -> tuple[CommandRule, ...]:
             },
         ),
         CommandRule(
+            executable="semgrep",
+            timeout_seconds=300,
+            boolean_options=(
+                "--disable-nosem",
+                "--disable-version-check",
+                "--error",
+                "--json",
+                "--quiet",
+            ),
+            value_options={
+                "--config": "text",
+                "--exclude": "text",
+                "--include": "text",
+                "--severity": "text",
+            },
+        ),
+        CommandRule(
             executable="pytest",
             timeout_seconds=300,
             boolean_options=(

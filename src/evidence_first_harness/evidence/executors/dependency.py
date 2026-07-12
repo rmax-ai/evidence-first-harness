@@ -2,18 +2,113 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
-from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
+
+if TYPE_CHECKING:
+    from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
+
+
+def _environment_digest(environment: dict[str, str]) -> str:
+    payload = "\n".join(f"{key}={value}" for key, value in sorted(environment.items()))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _build_record(
+    *,
+    requirement: EvidenceRequirement,
+    executor: str,
+    command: list[str],
+    started_at: datetime,
+    completed_at: datetime,
+    environment: dict[str, str],
+    status: str,
+    summary: str,
+    exit_code: int | None,
+    metrics: dict[str, float | int | str],
+    limitations: list[str],
+) -> EvidenceRecord:
+    return EvidenceRecord(
+        id=f"{requirement.id}_{executor}",
+        requirement_id=requirement.id,
+        status=status,
+        executor=executor,
+        command=command,
+        started_at=started_at,
+        completed_at=completed_at,
+        exit_code=exit_code,
+        summary=summary,
+        metrics=metrics,
+        environment_digest=_environment_digest(environment),
+        limitations=limitations,
+    )
+
+
+def _requirements_file(worktree_path: Path) -> Path | None:
+    requirements_path = worktree_path / "requirements.txt"
+    if requirements_path.is_file():
+        return requirements_path
+    return None
+
+
+def _pyproject_dependencies(worktree_path: Path) -> list[str]:
+    pyproject_path = worktree_path / "pyproject.toml"
+    if not pyproject_path.is_file():
+        return []
+
+    with pyproject_path.open("rb") as file_handle:
+        data = tomllib.load(file_handle)
+
+    project = data.get("project", {})
+    raw_dependencies = project.get("dependencies", [])
+    if not isinstance(raw_dependencies, list):
+        return []
+    return [dependency for dependency in raw_dependencies if isinstance(dependency, str)]
+
+
+def _parse_vulnerability_metrics(payload: Any) -> tuple[int, int]:
+    if not isinstance(payload, dict):
+        return 0, 0
+
+    critical = 0
+    total = 0
+    dependencies = payload.get("dependencies", [])
+    if not isinstance(dependencies, list):
+        return 0, 0
+
+    for dependency in dependencies:
+        if not isinstance(dependency, dict):
+            continue
+        vulns = dependency.get("vulns", [])
+        if not isinstance(vulns, list):
+            continue
+        total += len(vulns)
+        for vuln in vulns:
+            if not isinstance(vuln, dict):
+                continue
+            aliases = vuln.get("aliases", [])
+            description = str(vuln.get("description", ""))
+            if (
+                isinstance(aliases, list)
+                and any("critical" in str(alias).lower() for alias in aliases)
+            ) or "critical" in description.lower():
+                critical += 1
+
+    return total, critical
 
 
 class DependencyExecutor:
-    """Run pip-audit against the repository dependencies."""
+    """Run pip-audit against a dependency manifest and parse vulnerabilities."""
 
     name = "dependency"
 
@@ -22,208 +117,167 @@ class DependencyExecutor:
         context: EvidenceExecutionContext,
         requirement: EvidenceRequirement,
     ) -> EvidenceRecord:
-        """Audit dependencies for known vulnerabilities."""
-        started_at = context.started_at
-        audit_target = _select_audit_target(context.worktree_path)
-        if audit_target is None:
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="unavailable",
-                executor=self.name,
-                command=None,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=None,
-                summary="no requirements.txt or pyproject.toml found for dependency audit",
-                environment_digest=_environment_digest(context),
-            )
-
-        command = [context.python_path, "-m", "pip_audit", "-f", "json"]
-        if audit_target.name == "requirements.txt":
-            command.extend(["-r", audit_target.name])
+        """Execute pip-audit for the target worktree."""
+        started_at = datetime.now(UTC)
+        requirements_path = _requirements_file(context.worktree_path)
+        temporary_requirements_path: str | None = None
+        limitations: list[str] = []
 
         try:
-            result = subprocess.run(
-                command,
-                cwd=context.worktree_path,
-                capture_output=True,
-                text=True,
-                timeout=context.timeout_seconds,
-                check=False,
-                env=_build_environment(context),
-            )
-        except subprocess.TimeoutExpired:
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="error",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=None,
-                summary="pip-audit timed out",
-                environment_digest=_environment_digest(context),
-            )
-        except OSError as exc:
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="error",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=None,
-                summary=f"pip-audit could not start: {exc}",
-                environment_digest=_environment_digest(context),
-            )
+            if requirements_path is not None:
+                command = [
+                    context.python_path,
+                    "-m",
+                    "pip_audit",
+                    "--format",
+                    "json",
+                    "-r",
+                    str(requirements_path),
+                ]
+            else:
+                dependencies = _pyproject_dependencies(context.worktree_path)
+                if not dependencies:
+                    completed_at = datetime.now(UTC)
+                    return _build_record(
+                        requirement=requirement,
+                        executor=self.name,
+                        command=[context.python_path, "-m", "pip_audit"],
+                        started_at=started_at,
+                        completed_at=completed_at,
+                        environment=context.environment,
+                        status="unavailable",
+                        summary="No requirements.txt or project dependencies were found to audit",
+                        exit_code=None,
+                        metrics={"vulnerabilities_found": 0, "vulnerabilities_critical": 0},
+                        limitations=[
+                            "Add requirements.txt or declare dependencies "
+                            "in pyproject.toml for dependency auditing.",
+                        ],
+                    )
 
-        combined_output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
-        if _pip_audit_missing(combined_output):
+                file_descriptor, temporary_requirements_path = tempfile.mkstemp(suffix=".txt")
+                os.close(file_descriptor)
+                with Path(temporary_requirements_path).open("w", encoding="utf-8") as file_handle:
+                    file_handle.write("\n".join(dependencies))
+                command = [
+                    context.python_path,
+                    "-m",
+                    "pip_audit",
+                    "--format",
+                    "json",
+                    "-r",
+                    temporary_requirements_path,
+                ]
+                limitations.append(
+                    "Audited dependencies synthesized from pyproject.toml project.dependencies."
+                )
+
+            try:
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    command,
+                    capture_output=True,
+                    text=True,
+                    cwd=context.worktree_path,
+                    env=context.environment or None,
+                    timeout=context.timeout_seconds,
+                    check=False,
+                )
+            except FileNotFoundError:
+                completed_at = datetime.now(UTC)
+                return _build_record(
+                    requirement=requirement,
+                    executor=self.name,
+                    command=command,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    environment=context.environment,
+                    status="unavailable",
+                    summary="Python executable or pip-audit module was not found",
+                    exit_code=None,
+                    metrics={"vulnerabilities_found": 0, "vulnerabilities_critical": 0},
+                    limitations=[
+                        "Install pip-audit in the execution environment to audit dependencies."
+                    ],
+                )
+            except subprocess.TimeoutExpired:
+                completed_at = datetime.now(UTC)
+                return _build_record(
+                    requirement=requirement,
+                    executor=self.name,
+                    command=command,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    environment=context.environment,
+                    status="error",
+                    summary="Dependency audit timed out",
+                    exit_code=None,
+                    metrics={"vulnerabilities_found": 0, "vulnerabilities_critical": 0},
+                    limitations=[
+                        f"Execution exceeded timeout of {context.timeout_seconds} seconds."
+                    ],
+                )
+
             completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="unavailable",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
-                exit_code=result.returncode,
-                summary="pip-audit is not installed or not available",
-                environment_digest=_environment_digest(context),
-                limitations=["dependency auditing requires the pip-audit package"],
+            combined_output = "\n".join(
+                part for part in (result.stdout, result.stderr) if part.strip()
             )
+            lowered_output = combined_output.lower()
+            if "no module named pip_audit" in lowered_output:
+                return _build_record(
+                    requirement=requirement,
+                    executor=self.name,
+                    command=command,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    environment=context.environment,
+                    status="unavailable",
+                    summary="pip-audit is not installed in the execution environment",
+                    exit_code=result.returncode,
+                    metrics={"vulnerabilities_found": 0, "vulnerabilities_critical": 0},
+                    limitations=["Install pip-audit to enable dependency vulnerability scanning."],
+                )
 
-        parsed = _parse_pip_audit_output(result.stdout)
-        vulnerabilities_found = parsed["vulnerabilities_found"]
-        vulnerabilities_critical = parsed["vulnerabilities_critical"]
-        completed_at = datetime.now(UTC)
+            vulnerabilities_found = 0
+            vulnerabilities_critical = 0
+            if result.stdout.strip():
+                try:
+                    parsed_output = json.loads(result.stdout)
+                    vulnerabilities_found, vulnerabilities_critical = _parse_vulnerability_metrics(
+                        parsed_output
+                    )
+                except json.JSONDecodeError:
+                    limitations.append(
+                        "pip-audit output was not valid JSON; "
+                        "vulnerability counts may be incomplete."
+                    )
 
-        limitations: list[str] = []
-        if parsed["severity_supported"] == 0:
+            status = "pass" if vulnerabilities_found == 0 and result.returncode == 0 else "fail"
+            summary = (
+                "Dependency audit passed with no known vulnerabilities"
+                if status == "pass"
+                else "Dependency audit reported known vulnerabilities or execution issues"
+            )
             limitations.append(
-                "pip-audit output did not include severity levels; critical count may be zero"
+                "Critical vulnerability count depends on metadata present in pip-audit output."
             )
 
-        return EvidenceRecord(
-            id=_record_id(requirement.id, self.name),
-            requirement_id=requirement.id,
-            status="pass" if vulnerabilities_found == 0 else "fail",
-            executor=self.name,
-            command=command,
-            started_at=started_at,
-            completed_at=completed_at,
-            exit_code=result.returncode,
-            summary=_build_summary(vulnerabilities_found, vulnerabilities_critical),
-            metrics={
-                "vulnerabilities_found": vulnerabilities_found,
-                "vulnerabilities_critical": vulnerabilities_critical,
-            },
-            environment_digest=_environment_digest(context),
-            limitations=limitations,
-        )
-
-
-def _build_environment(context: EvidenceExecutionContext) -> dict[str, str]:
-    environment = dict(context.environment)
-    return environment
-
-
-def _environment_digest(context: EvidenceExecutionContext) -> str:
-    parts = [
-        f"python_path={context.python_path}",
-        f"timeout_seconds={context.timeout_seconds}",
-        f"sandbox_id={context.sandbox_id or ''}",
-    ]
-    parts.extend(
-        f"{key}={value}"
-        for key, value in sorted(context.environment.items(), key=lambda item: item[0])
-    )
-    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
-
-
-def _select_audit_target(worktree_path: Path) -> Path | None:
-    requirements_path = worktree_path / "requirements.txt"
-    if requirements_path.exists():
-        return requirements_path
-    pyproject_path = worktree_path / "pyproject.toml"
-    if pyproject_path.exists():
-        return pyproject_path
-    return None
-
-
-def _pip_audit_missing(output: str) -> bool:
-    lowered = output.lower()
-    return "no module named pip_audit" in lowered or "no module named pip-audit" in lowered
-
-
-def _parse_pip_audit_output(output: str) -> dict[str, int]:
-    stripped = output.strip()
-    if not stripped:
-        return {
-            "vulnerabilities_found": 0,
-            "vulnerabilities_critical": 0,
-            "severity_supported": 0,
-        }
-
-    try:
-        payload = json.loads(stripped)
-    except json.JSONDecodeError:
-        return {
-            "vulnerabilities_found": 0,
-            "vulnerabilities_critical": 0,
-            "severity_supported": 0,
-        }
-
-    if not isinstance(payload, list):
-        return {
-            "vulnerabilities_found": 0,
-            "vulnerabilities_critical": 0,
-            "severity_supported": 0,
-        }
-
-    vulnerabilities_found = 0
-    vulnerabilities_critical = 0
-    severity_supported = 0
-
-    for dependency in payload:
-        if not isinstance(dependency, dict):
-            continue
-        vulnerabilities = dependency.get("vulns")
-        if not isinstance(vulnerabilities, list):
-            continue
-        vulnerabilities_found += len(vulnerabilities)
-        for vulnerability in vulnerabilities:
-            if not isinstance(vulnerability, dict):
-                continue
-            severity = vulnerability.get("severity")
-            if isinstance(severity, str):
-                severity_supported = 1
-                if severity.lower() == "critical":
-                    vulnerabilities_critical += 1
-
-    return {
-        "vulnerabilities_found": vulnerabilities_found,
-        "vulnerabilities_critical": vulnerabilities_critical,
-        "severity_supported": severity_supported,
-    }
-
-
-def _build_summary(vulnerabilities_found: int, vulnerabilities_critical: int) -> str:
-    if vulnerabilities_found == 0:
-        return "pip-audit found no known vulnerabilities"
-    return (
-        "pip-audit found "
-        f"{vulnerabilities_found} known vulnerabilities, "
-        f"{vulnerabilities_critical} marked critical"
-    )
-
-
-def _record_id(requirement_id: str, executor_name: str) -> str:
-    return f"{requirement_id}_{executor_name}"
+            return _build_record(
+                requirement=requirement,
+                executor=self.name,
+                command=command,
+                started_at=started_at,
+                completed_at=completed_at,
+                environment=context.environment,
+                status=status,
+                summary=summary,
+                exit_code=result.returncode,
+                metrics={
+                    "vulnerabilities_found": vulnerabilities_found,
+                    "vulnerabilities_critical": vulnerabilities_critical,
+                },
+                limitations=limitations,
+            )
+        finally:
+            if temporary_requirements_path is not None:
+                Path(temporary_requirements_path).unlink(missing_ok=True)

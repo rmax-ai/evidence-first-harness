@@ -6,7 +6,7 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Literal
+from typing import Literal, cast
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from evidence_first_harness.domain.exceptions import SandboxError
 
 NetworkMode = Literal["disabled", "proxy", "full"]
+_HOST_DOCKER_SOCKET = Path("/var/run/docker.sock")
 
 _FORBIDDEN_ENVIRONMENT_PATTERN = re.compile(
     r"(SECRET|TOKEN|PASSWORD|CREDENTIAL|AWS_|AZURE_|GCP_|GOOGLE_APPLICATION_CREDENTIALS|"
@@ -65,7 +66,8 @@ class SandboxPermissions(BaseModel):
 
         if not resolved_path.is_dir():
             raise SandboxError(f"Worktree path must be a directory: {resolved_path}")
-        if resolved_path == Path("/var/run/docker.sock"):
+        resolved_socket = _HOST_DOCKER_SOCKET.resolve(strict=False)
+        if resolved_path == resolved_socket or resolved_socket.is_relative_to(resolved_path):
             raise SandboxError("Host Docker socket access is forbidden")
 
         return resolved_path
@@ -75,7 +77,7 @@ class SandboxPermissions(BaseModel):
         effective_mode = network_mode or self.network_mode
         if effective_mode not in {"disabled", "proxy", "full"}:
             raise SandboxError(f"Unsupported network mode: {effective_mode}")
-        return effective_mode
+        return cast("NetworkMode", effective_mode)
 
     def docker_network_mode(self, network_mode: str | None = None) -> str:
         """Translate the logical network mode to a Docker network mode."""

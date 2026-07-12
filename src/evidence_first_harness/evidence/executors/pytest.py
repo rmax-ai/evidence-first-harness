@@ -2,20 +2,81 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
-from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
 
-_SUMMARY_PATTERN = re.compile(r"(?P<count>\d+)\s+(?P<label>passed|failed|skipped|error)")
+if TYPE_CHECKING:
+    from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
+
+_TEST_SUMMARY_PATTERN = re.compile(r"(?P<count>\d+)\s+(?P<label>passed|failed)")
+
+
+def _environment_digest(environment: dict[str, str]) -> str:
+    payload = "\n".join(f"{key}={value}" for key, value in sorted(environment.items()))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _tests_directory_warning(worktree_path: Path) -> str | None:
+    tests_dir = worktree_path / "tests"
+    if not tests_dir.exists():
+        return "tests directory does not exist"
+    if not any(path.is_file() for path in tests_dir.rglob("*")):
+        return "tests directory exists but contains no files"
+    return None
+
+
+def _parse_test_counts(output: str) -> tuple[int, int]:
+    passed = 0
+    failed = 0
+    for match in _TEST_SUMMARY_PATTERN.finditer(output):
+        count = int(match.group("count"))
+        label = match.group("label")
+        if label == "passed":
+            passed = count
+        elif label == "failed":
+            failed = count
+    return passed, failed
+
+
+def _build_record(
+    *,
+    requirement: EvidenceRequirement,
+    executor: str,
+    command: list[str],
+    started_at: datetime,
+    completed_at: datetime,
+    environment: dict[str, str],
+    status: str,
+    summary: str,
+    exit_code: int | None,
+    metrics: dict[str, float | int | str],
+    limitations: list[str],
+) -> EvidenceRecord:
+    return EvidenceRecord(
+        id=f"{requirement.id}_{executor}",
+        requirement_id=requirement.id,
+        status=status,
+        executor=executor,
+        command=command,
+        started_at=started_at,
+        completed_at=completed_at,
+        exit_code=exit_code,
+        summary=summary,
+        metrics=metrics,
+        environment_digest=_environment_digest(environment),
+        limitations=limitations,
+    )
 
 
 class PytestExecutor:
-    """Run pytest and parse the resulting test counts."""
+    """Run pytest and report test execution metrics."""
 
     name = "pytest"
 
@@ -24,136 +85,91 @@ class PytestExecutor:
         context: EvidenceExecutionContext,
         requirement: EvidenceRequirement,
     ) -> EvidenceRecord:
-        """Execute pytest in the target worktree."""
-        started_at = context.started_at
+        """Execute pytest for the target worktree."""
+        started_at = datetime.now(UTC)
         command = [context.pytest_path, "-q", "--tb=short"]
         limitations: list[str] = []
-        tests_dir = context.worktree_path / "tests"
-        if not tests_dir.exists():
-            limitations.append("tests directory does not exist")
-        elif not any(tests_dir.iterdir()):
-            limitations.append("tests directory is empty")
+
+        tests_warning = _tests_directory_warning(context.worktree_path)
+        if tests_warning is not None:
+            limitations.append(tests_warning)
 
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 command,
-                cwd=context.worktree_path,
                 capture_output=True,
                 text=True,
+                cwd=context.worktree_path,
+                env=context.environment or None,
                 timeout=context.timeout_seconds,
                 check=False,
-                env=_build_environment(context),
+            )
+        except FileNotFoundError:
+            completed_at = datetime.now(UTC)
+            return _build_record(
+                requirement=requirement,
+                executor=self.name,
+                command=command,
+                started_at=started_at,
+                completed_at=completed_at,
+                environment=context.environment,
+                status="unavailable",
+                summary="Pytest executable was not found",
+                exit_code=None,
+                metrics={"tests_passed": 0, "tests_failed": 0, "tests_total": 0},
+                limitations=[
+                    *limitations,
+                    "Install pytest or provide a valid pytest_path in the execution context.",
+                ],
             )
         except subprocess.TimeoutExpired:
             completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
-                status="error",
+            return _build_record(
+                requirement=requirement,
                 executor=self.name,
                 command=command,
                 started_at=started_at,
                 completed_at=completed_at,
-                exit_code=None,
-                summary="pytest timed out",
-                environment_digest=_environment_digest(context),
-                limitations=limitations,
-            )
-        except OSError as exc:
-            completed_at = datetime.now(UTC)
-            return EvidenceRecord(
-                id=_record_id(requirement.id, self.name),
-                requirement_id=requirement.id,
+                environment=context.environment,
                 status="error",
-                executor=self.name,
-                command=command,
-                started_at=started_at,
-                completed_at=completed_at,
+                summary="Pytest execution timed out",
                 exit_code=None,
-                summary=f"pytest could not start: {exc}",
-                environment_digest=_environment_digest(context),
-                limitations=limitations,
+                metrics={"tests_passed": 0, "tests_failed": 0, "tests_total": 0},
+                limitations=[
+                    *limitations,
+                    f"Execution exceeded timeout of {context.timeout_seconds} seconds.",
+                ],
             )
 
-        output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
-        counts = _parse_summary_counts(output)
-        passed = counts.get("passed", 0)
-        failed = counts.get("failed", 0) + counts.get("error", 0)
-        total = passed + failed
         completed_at = datetime.now(UTC)
+        combined_output = "\n".join(part for part in (result.stdout, result.stderr) if part.strip())
+        tests_passed, tests_failed = _parse_test_counts(combined_output)
+        tests_total = tests_passed + tests_failed
 
-        status = _status_for_result(result.returncode, total, failed)
-        summary = _build_summary(status, passed, failed, total, result.returncode)
+        status = "pass" if result.returncode == 0 else "fail"
+        summary = (
+            "Pytest checks passed"
+            if result.returncode == 0
+            else "Pytest reported failing tests or execution issues"
+        )
+        if tests_warning is not None:
+            summary = f"{summary}; warning: {tests_warning}"
 
-        if result.returncode == 5:
-            limitations.append("pytest reported that no tests were collected")
-
-        return EvidenceRecord(
-            id=_record_id(requirement.id, self.name),
-            requirement_id=requirement.id,
-            status=status,
+        return _build_record(
+            requirement=requirement,
             executor=self.name,
             command=command,
             started_at=started_at,
             completed_at=completed_at,
-            exit_code=result.returncode,
+            environment=context.environment,
+            status=status,
             summary=summary,
+            exit_code=result.returncode,
             metrics={
-                "tests_passed": passed,
-                "tests_failed": failed,
-                "tests_total": total,
+                "tests_passed": tests_passed,
+                "tests_failed": tests_failed,
+                "tests_total": tests_total,
             },
-            environment_digest=_environment_digest(context),
             limitations=limitations,
         )
-
-
-def _build_environment(context: EvidenceExecutionContext) -> dict[str, str]:
-    environment = dict(context.environment)
-    return environment
-
-
-def _environment_digest(context: EvidenceExecutionContext) -> str:
-    parts = [
-        f"python_path={context.python_path}",
-        f"pytest_path={context.pytest_path}",
-        f"timeout_seconds={context.timeout_seconds}",
-        f"sandbox_id={context.sandbox_id or ''}",
-    ]
-    parts.extend(
-        f"{key}={value}"
-        for key, value in sorted(context.environment.items(), key=lambda item: item[0])
-    )
-    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
-
-
-def _parse_summary_counts(output: str) -> dict[str, int]:
-    counts = {"passed": 0, "failed": 0, "skipped": 0, "error": 0}
-    for match in _SUMMARY_PATTERN.finditer(output):
-        label = match.group("label")
-        counts[label] = counts.get(label, 0) + int(match.group("count"))
-    return counts
-
-
-def _status_for_result(returncode: int, total: int, failed: int) -> str:
-    if returncode == 0:
-        return "pass"
-    if returncode == 5 or total == 0:
-        return "partial"
-    if failed > 0:
-        return "fail"
-    return "error"
-
-
-def _build_summary(status: str, passed: int, failed: int, total: int, returncode: int) -> str:
-    if status == "pass":
-        return f"pytest passed {passed} of {total} tests"
-    if status == "partial":
-        return "pytest did not collect any tests"
-    if status == "fail":
-        return f"pytest reported {failed} failing tests out of {total}"
-    return f"pytest exited with code {returncode}"
-
-
-def _record_id(requirement_id: str, executor_name: str) -> str:
-    return f"{requirement_id}_{executor_name}"

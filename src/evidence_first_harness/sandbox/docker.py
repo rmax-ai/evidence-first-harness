@@ -8,9 +8,11 @@ import shutil
 import tarfile
 import tempfile
 import time
+from collections.abc import Iterable
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import docker
 import structlog
@@ -264,7 +266,10 @@ class DockerSandbox:
                 stdin_open=False,
                 labels={"efh.managed": "true"},
             )
-            return container.id
+            container_id = container.id
+            if container_id is None:
+                raise SandboxError("Docker did not return a container ID")
+            return container_id
         except DockerException as exc:
             raise self._wrap_docker_error("Failed to create sandbox container", exc) from exc
 
@@ -279,18 +284,23 @@ class DockerSandbox:
                     f"Sandbox container is not running: {container_id} ({container.status})"
                 )
 
-            exec_id = client.api.exec_create(
-                container_id,
-                command,
-                stdout=True,
-                stderr=True,
-                stdin=False,
-                tty=False,
-                user="sandbox",
-                workdir=self._permissions.workspace_path,
-            )["Id"]
+            api_client: Any = client.api
+            exec_create_result = cast(
+                "dict[str, Any]",
+                api_client.exec_create(
+                    container_id,
+                    command,
+                    stdout=True,
+                    stderr=True,
+                    stdin=False,
+                    tty=False,
+                    user="sandbox",
+                    workdir=self._permissions.workspace_path,
+                ),
+            )
+            exec_id = cast("str", exec_create_result["Id"])
 
-            stream = client.api.exec_start(exec_id, stream=True, demux=True)
+            stream = api_client.exec_start(exec_id, stream=True, demux=True)
             stdout_chunks: list[bytes] = []
             stderr_chunks: list[bytes] = []
             total_bytes = 0
@@ -325,7 +335,7 @@ class DockerSandbox:
                     break
 
             try:
-                exec_details = client.api.exec_inspect(exec_id)
+                exec_details = cast("dict[str, Any]", api_client.exec_inspect(exec_id))
                 exit_code = int(exec_details.get("ExitCode") or 0)
             except APIError:
                 exit_code = -1
@@ -349,7 +359,11 @@ class DockerSandbox:
 
         client = self._get_client()
         try:
-            archive_stream, _ = client.api.get_archive(container_id, src)
+            api_client: Any = client.api
+            archive_stream, _ = cast(
+                "tuple[Iterable[bytes], Any]",
+                api_client.get_archive(container_id, src),
+            )
             with tempfile.TemporaryDirectory(prefix="efh-copy-out-") as tmp_dir:
                 archive_path = Path(tmp_dir) / "archive.tar"
                 with archive_path.open("wb") as archive_file:
@@ -414,7 +428,7 @@ class DockerSandbox:
         if self._client is None:
             try:
                 client = docker.from_env()
-                client.ping()
+                cast("Any", client).ping()
             except DockerException as exc:
                 raise SandboxError("Docker daemon is unavailable") from exc
             self._client = client
@@ -422,18 +436,33 @@ class DockerSandbox:
 
     def _safe_extract_archive(self, archive: tarfile.TarFile, destination: Path) -> None:
         """Extract a tar archive while blocking path traversal and links."""
-        for member in archive.getmembers():
+        destination_resolved = destination.resolve()
+        members = archive.getmembers()
+        for member in members:
             if member.issym() or member.islnk():
                 raise SandboxError("Sandbox archive cannot contain symbolic links")
+            if not member.isdir() and not member.isfile():
+                raise SandboxError("Sandbox archive contains an unsupported file type")
 
             member_destination = (destination / member.name).resolve()
             if (
-                destination.resolve() not in member_destination.parents
-                and member_destination != destination.resolve()
+                destination_resolved not in member_destination.parents
+                and member_destination != destination_resolved
             ):
                 raise SandboxError("Sandbox archive attempted path traversal")
 
-        archive.extractall(destination)
+        for member in members:
+            target_path = destination / member.name
+            if member.isdir():
+                target_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            extracted_file = archive.extractfile(member)
+            if extracted_file is None:
+                raise SandboxError("Sandbox archive file payload could not be read")
+            with extracted_file, target_path.open("wb") as target_file:
+                shutil.copyfileobj(extracted_file, target_file)
 
     def _wrap_docker_error(self, message: str, error: DockerException) -> SandboxError:
         """Convert Docker SDK errors into sandbox domain errors."""
