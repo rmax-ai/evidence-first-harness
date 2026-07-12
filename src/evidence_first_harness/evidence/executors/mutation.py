@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import re
 import subprocess
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
 
@@ -24,14 +25,14 @@ _MUTATION_SUMMARY_PATTERN = re.compile(
 class MutationExecutor:
     """Run mutmut mutation testing and summarize the result."""
 
-    name = "mutation"
+    name = "mutation_test"
 
     async def execute(
         self,
         context: EvidenceExecutionContext,
         requirement: EvidenceRequirement,
     ) -> EvidenceRecord:
-        """Run mutmut in the target worktree and return a structured record."""
+        """Run mutmut against the worktree and return structured evidence."""
         started_at = datetime.now(UTC)
         command = [
             context.python_path,
@@ -125,7 +126,7 @@ class MutationExecutor:
                 completed_at=completed_at,
                 status="error",
                 exit_code=result.returncode,
-                summary="mutmut completed but its killed/survived summary could not be parsed.",
+                summary=("mutmut completed but its killed/survived summary could not be parsed."),
                 environment_digest=environment_digest,
                 limitations=[
                     "Expected a mutmut summary with killed, survived, and timeout counts."
@@ -138,18 +139,14 @@ class MutationExecutor:
         total = killed + survived
         mutation_score = killed / total if total else 0.0
 
-        status = "pass" if result.returncode == 0 and survived == 0 else "fail"
-        summary = (
-            f"mutmut killed {killed} of {total} scored mutants."
-            if status == "pass"
-            else f"mutmut reported {survived} surviving mutants out of {total} scored mutants."
+        status, summary, limitations = _evaluate_result(
+            result=result,
+            requirement=requirement,
+            survived=survived,
+            timed_out=timed_out,
+            total=total,
+            mutation_score=mutation_score,
         )
-        limitations: list[str] = []
-        if timed_out:
-            limitations.append(f"{timed_out} mutants timed out during execution.")
-        if total == 0:
-            status = "partial"
-            summary = "mutmut ran but reported no scored mutants."
 
         return _build_record(
             requirement=requirement,
@@ -172,9 +169,59 @@ class MutationExecutor:
         )
 
 
-def _build_environment(context: EvidenceExecutionContext) -> dict[str, str] | None:
-    environment = dict(context.environment)
-    return environment or None
+def _evaluate_result(
+    *,
+    result: subprocess.CompletedProcess[str],
+    requirement: EvidenceRequirement,
+    survived: int,
+    timed_out: int,
+    total: int,
+    mutation_score: float,
+) -> tuple[Literal["pass", "fail", "partial", "error"], str, list[str]]:
+    limitations: list[str] = []
+    if timed_out:
+        limitations.append(f"{timed_out} mutants timed out during execution.")
+
+    if total == 0:
+        limitations.append("mutmut reported no killed or survived mutants.")
+        return "partial", "mutmut ran but reported no scored mutants.", limitations
+
+    if result.returncode != 0 and survived == 0:
+        return (
+            "error",
+            "mutmut exited non-zero without reporting surviving mutants.",
+            limitations,
+        )
+
+    if requirement.minimum_threshold is not None:
+        if mutation_score >= requirement.minimum_threshold:
+            return (
+                "pass",
+                f"Mutation score {mutation_score:.3f} meets the required threshold "
+                f"of {requirement.minimum_threshold:.3f}.",
+                limitations,
+            )
+        return (
+            "fail",
+            f"Mutation score {mutation_score:.3f} is below the required threshold "
+            f"of {requirement.minimum_threshold:.3f}.",
+            limitations,
+        )
+
+    if survived > 0:
+        return (
+            "fail",
+            f"mutmut reported {survived} surviving mutants out of {total} scored mutants.",
+            limitations,
+        )
+
+    return "pass", f"mutmut killed all {total} scored mutants.", limitations
+
+
+def _build_environment(context: EvidenceExecutionContext) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(context.environment)
+    return environment
 
 
 def _environment_digest(context: EvidenceExecutionContext) -> str:
@@ -206,7 +253,7 @@ def _build_record(
     command: list[str],
     started_at: datetime,
     completed_at: datetime,
-    status: str,
+    status: Literal["pass", "fail", "partial", "error", "unavailable"],
     exit_code: int | None,
     summary: str,
     environment_digest: str,

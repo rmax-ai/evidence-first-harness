@@ -154,8 +154,7 @@ class CoverageExecutor:
                 exit_code=result.returncode,
                 metrics={"coverage_pct": 0.0, "tests_passed": 0, "tests_total": 0},
                 limitations=[
-                    "Install pytest-cov in the execution environment "
-                    "to collect coverage."
+                    "Install pytest-cov in the execution environment to collect coverage."
                 ],
             )
 

@@ -134,6 +134,7 @@ class SemgrepExecutor:
             environment_digest=environment_digest,
             limitations=[
                 "Semgrep coverage is limited to rules selected by the auto configuration.",
-                "Results depend on the installed Semgrep version, network availability, and rule corpus.",
+                "Results depend on the installed Semgrep version, "
+                "network availability, and rule corpus.",
             ],
         )

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import re
 import subprocess
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
 
@@ -25,14 +26,14 @@ _MAX_FILE_CHANGE_LINES = 1_000
 class GitDiffExecutor:
     """Validate git patch structure and coarse size guardrails."""
 
-    name = "gitdiff"
+    name = "git_validation"
 
     async def execute(
         self,
         context: EvidenceExecutionContext,
         requirement: EvidenceRequirement,
     ) -> EvidenceRecord:
-        """Validate the repository diff and summarize coarse patch health checks."""
+        """Validate the diff stat, changed-file shape, and patch applicability."""
         started_at = datetime.now(UTC)
         command = ["git", "diff", "HEAD~1", "--stat"]
         environment_digest = _environment_digest(context)
@@ -138,7 +139,7 @@ class GitDiffExecutor:
                 completed_at=completed_at,
                 status="error",
                 exit_code=stat_result.returncode,
-                summary="git diff --stat completed but its summary line could not be parsed.",
+                summary=("git diff --stat completed but its summary line could not be parsed."),
                 environment_digest=environment_digest,
                 limitations=[
                     "Expected files changed, insertions, and deletions in git diff --stat output."
@@ -203,7 +204,7 @@ class GitDiffExecutor:
                 f"and {deletions} deletions."
             )
         ]
-        status = "pass"
+        status: Literal["pass", "fail"] = "pass"
 
         if binary_files:
             status = "fail"
@@ -243,9 +244,10 @@ class GitDiffExecutor:
         )
 
 
-def _build_environment(context: EvidenceExecutionContext) -> dict[str, str] | None:
-    environment = dict(context.environment)
-    return environment or None
+def _build_environment(context: EvidenceExecutionContext) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(context.environment)
+    return environment
 
 
 def _environment_digest(context: EvidenceExecutionContext) -> str:
@@ -313,7 +315,7 @@ def _build_record(
     command: list[str],
     started_at: datetime,
     completed_at: datetime,
-    status: str,
+    status: Literal["pass", "fail", "partial", "error", "unavailable"],
     exit_code: int | None,
     summary: str,
     environment_digest: str,
