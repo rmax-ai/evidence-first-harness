@@ -1,5 +1,6 @@
 // Shared data for the Evidence-First Harness landing page.
 // Single source of truth — components import from here.
+// Pricing updated 2026-07-13 from official provider docs.
 
 export const PROJECT = {
   name: "Evidence-First Harness",
@@ -11,6 +12,14 @@ export const PROJECT = {
 export const PRINCIPLE =
   "No agent-generated change may be accepted unless every material claim introduced by the change is linked to sufficient, reproducible, risk-adjusted evidence.";
 
+// Source links for pricing claims
+export const PRICING_SOURCES: Record<string, string> = {
+  anthropic: "https://docs.anthropic.com/en/docs/about-claude/pricing",
+  anthropic_sonnet5: "https://www.anthropic.com/news/claude-sonnet-5",
+  deepseek: "https://api-docs.deepseek.com/quick_start/pricing",
+  gemini: "https://ai.google.dev/pricing",
+};
+
 export const STACK = [
   "Python 3.12+",
   "Google ADK 2.0",
@@ -20,13 +29,18 @@ export const STACK = [
   "Docker sandbox",
 ];
 
+export const STATUS_LINE = "Alpha-stage prototype · Phase 6 checkpoint · v0.1.0 · MIT License";
+
+export const STATUS_CAVEAT =
+  "Repository metrics reflect the current public repository state at the time of publication and may change.";
+
 export const METRICS = [
-  { label: "73", desc: "Unit tests" },
-  { label: "18", desc: "Commits" },
-  { label: "3/6", desc: "LLM agents live" },
-  { label: "9", desc: "Evidence executors" },
-  { label: "$0.32", desc: "Cost per run" },
-  { label: "17", desc: "Workflow nodes" },
+  { label: "73", desc: "Unit tests", source: `${PROJECT.repo}` },
+  { label: "MIT", desc: "License", source: `${PROJECT.repo}/blob/main/LICENSE` },
+  { label: "3/6", desc: "LLM agents live", source: `${PROJECT.repo}` },
+  { label: "9", desc: "Evidence executors", source: `${PROJECT.repo}` },
+  { label: "~$0.11", desc: "Est. cost/run", source: `${PROJECT.repo}#smoke-test` },
+  { label: "17", desc: "Workflow nodes", source: `${PROJECT.repo}` },
 ];
 
 export interface AgentRow {
@@ -41,24 +55,59 @@ export interface AgentRow {
 export const AGENT_ROUTING: AgentRow[] = [
   { agent: "Specification", model: "claude-opus-4-6", provider: "Anthropic", live: true, inTokens: 294, outTokens: 4096 },
   { agent: "Planner", model: "claude-sonnet-5", provider: "Anthropic", live: true, inTokens: 430, outTokens: 770 },
-  { agent: "Implementation", model: "deepseek-chat", provider: "DeepSeek", live: true, inTokens: 276, outTokens: 34 },
+  { agent: "Implementation", model: "deepseek-chat‡", provider: "DeepSeek", live: true, inTokens: 276, outTokens: 34 },
   { agent: "Independent Test", model: "claude-haiku-4-5", provider: "Anthropic", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Adversarial Review", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Explanation", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
 ];
 
+export const AGENT_FOOTNOTE = "‡ deepseek-chat is a compatibility alias for deepseek-v4-flash. Alias deprecated 2026-07-24.";
+
 export interface PricingRow {
   model: string;
   inputPrice: number;
   outputPrice: number;
+  note: string;
+  source?: string;
 }
 
+// Pricing as of 2026-07-13. Sources: provider API pricing pages.
 export const PRICING: PricingRow[] = [
-  { model: "claude-opus-4-6", inputPrice: 15.00, outputPrice: 75.00 },
-  { model: "claude-sonnet-5", inputPrice: 3.00, outputPrice: 15.00 },
-  { model: "claude-haiku-4-5", inputPrice: 0.80, outputPrice: 4.00 },
-  { model: "deepseek-chat", inputPrice: 0.27, outputPrice: 1.10 },
-  { model: "gemini-3.5-flash", inputPrice: 0.075, outputPrice: 0.30 },
+  {
+    model: "claude-opus-4-6",
+    inputPrice: 5.00,
+    outputPrice: 25.00,
+    note: "",
+    source: PRICING_SOURCES.anthropic,
+  },
+  {
+    model: "claude-sonnet-5",
+    inputPrice: 2.00,
+    outputPrice: 10.00,
+    note: "Introductory pricing through 2026-08-31. $3/$15 from 2026-09-01.",
+    source: PRICING_SOURCES.anthropic_sonnet5,
+  },
+  {
+    model: "claude-haiku-4-5",
+    inputPrice: 1.00,
+    outputPrice: 5.00,
+    note: "",
+    source: PRICING_SOURCES.anthropic,
+  },
+  {
+    model: "deepseek-v4-flash",
+    inputPrice: 0.14,
+    outputPrice: 0.28,
+    note: "Cache-miss input; cache-hit is $0.0028. Alias: deepseek-chat until 2026-07-24.",
+    source: PRICING_SOURCES.deepseek,
+  },
+  {
+    model: "gemini-3.5-flash",
+    inputPrice: 1.50,
+    outputPrice: 9.00,
+    note: "Standard tier visible pricing. Actual cost may differ by tier/region.",
+    source: PRICING_SOURCES.gemini,
+  },
 ];
 
 export interface BoundaryRow {
@@ -71,13 +120,13 @@ export const BOUNDARY: BoundaryRow[] = [
   { component: "Specification agent", type: "llm", controls: "Interprets tasks, derives requirements" },
   { component: "Planner agent", type: "llm", controls: "Proposes implementation plan" },
   { component: "Implementation agent", type: "llm", controls: "Generates code in sandbox" },
-  { component: "Independent test agent", type: "llm", controls: "Generates additional tests" },
-  { component: "Adversarial review agent", type: "llm", controls: "Identifies unsupported claims" },
-  { component: "Explanation agent", type: "llm", controls: "Converts evidence to report" },
+  { component: "Independent test agent", type: "llm", controls: "Generates additional tests (stubbed in alpha)" },
+  { component: "Adversarial review agent", type: "llm", controls: "Identifies unsupported claims (stubbed in alpha)" },
+  { component: "Explanation agent", type: "llm", controls: "Converts evidence to report (stubbed in alpha)" },
   { component: "Policy engine", type: "deterministic", controls: "Required evidence, thresholds, approval roles" },
   { component: "Decision engine", type: "deterministic", controls: "Accept / reject / repair decision" },
   { component: "Sandbox manager", type: "deterministic", controls: "Isolation, permissions, timeouts" },
-  { component: "Evidence executors", type: "deterministic", controls: "Run checks, produce EvidenceRecords" },
+  { component: "Evidence executors", type: "deterministic", controls: "Run checks, record EvidenceRecords" },
   { component: "AST analyzer", type: "deterministic", controls: "Impact analysis, test selection" },
   { component: "Provenance recorder", type: "deterministic", controls: "Hash-chained event stream" },
 ];
@@ -102,14 +151,30 @@ export const QUICK_START = [
   { cmd: "uv run efh run --repo .", desc: "Full E2E smoke test (~90s)" },
 ];
 
+// Cost explanation shown below smoke output
+export const SMOKE_CAVEAT =
+  "The transcript below is a representative smoke-test run from the alpha harness. " +
+  "It shows the intended separation of roles: LLM agents produce implementation and review artifacts, " +
+  "while deterministic checks and policy decide the workflow outcome. " +
+  "Exact runtime, token counts, and cost vary with provider pricing, API behavior, cache state, " +
+  "model routing, and repository state. Treat the displayed cost as a run-specific estimate, " +
+  "not a guaranteed current API price.";
+
+export const COST_BREAKDOWN =
+  "Estimated run cost: approximately $0.1125 under current pricing assumptions as of 2026-07-13, " +
+  "using Sonnet 5 introductory pricing ($2/$10 per 1M tokens). " +
+  "Under standard Sonnet 5 pricing ($3/$15 from 2026-09-01), the estimate is $0.1170. " +
+  "These estimates exclude hidden/tool overhead and provider-side accounting differences. " +
+  "The cost in the transcript reflects the project's original pinned pricing assumptions.";
+
 export const SMOKE_OUTPUT = `$ efh run --repo .
 
 workflow_started    run_id=run_3da28c6662d9
 worktree_created    base_commit=9007ebb1
 
-specification_agent_call   opus-4-6   in=294   out=4096   \$0.311610
-planner_agent_call         sonnet-5   in=430   out=770    \$0.012840
-implementation_agent_call  deepseek   in=276   out=34     \$0.000112
+specification_agent_call   opus-4-6   in=294   out=4096
+planner_agent_call         sonnet-5   in=430   out=770
+implementation_agent_call  deepseek   in=276   out=34
 
 evidence_executed  formatting  ruff     fail
 evidence_executed  lint        ruff     fail
@@ -120,10 +185,10 @@ evidence_executed  tests       pytest   fail
 decision_rendered  decision=repair_required
   mandatory_failed=4  passed=1  tier=3
 
-│ Agent              Model                  In    Out  Cost (USD) │
-├──────────────────┼──────────────────┼──────┼──────┼──────────┤
-│ specification      claude-opus-4-6       294   4096  \$0.311610 │
-│ planner            claude-sonnet-5       430    770  \$0.012840 │
-│ implementation     deepseek-chat         276     34  \$0.000112 │
-├──────────────────┼──────────────────┼──────┼──────┼──────────┤
-│ TOTAL                                   1000   4900  \$0.324562 │`;
+│ Agent              Model                  In    Out │
+├──────────────────┼──────────────────┼──────┼──────┤
+│ specification      claude-opus-4-6       294   4096 │
+│ planner            claude-sonnet-5       430    770 │
+│ implementation     deepseek-chat         276     34 │
+├──────────────────┼──────────────────┼──────┼──────┤
+│ TOTAL                                   1000   4900 │`;

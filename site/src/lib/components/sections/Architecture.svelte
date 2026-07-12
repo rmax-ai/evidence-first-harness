@@ -9,6 +9,12 @@
     Architecture
   </h2>
 
+  <p class="text-slate-500 text-xs font-mono mb-4">
+    Illustrative architecture — not a benchmark or production deployment.
+    In the shown configuration, LLM agents produce implementation and review artifacts;
+    deterministic checks and policy decide the workflow outcome.
+  </p>
+
   <!-- Pipeline Diagram -->
   <div class="mb-12 border border-slate-800 rounded-sm overflow-hidden">
     <div class="flex items-center justify-between px-3 py-1.5 bg-slate-900/60 border-b border-slate-800">

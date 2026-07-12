@@ -1,6 +1,6 @@
 <script lang="ts">
   import Section from "$lib/components/ui/Section.svelte";
-  import { AGENT_ROUTING, PRICING } from "$lib/data/meta";
+  import { AGENT_ROUTING, AGENT_FOOTNOTE, PRICING, PRICING_SOURCES } from "$lib/data/meta";
 </script>
 
 <Section id="routing">
@@ -44,27 +44,39 @@
           </tbody>
         </table>
       </div>
+      <p class="mt-2 text-slate-600 text-[10px] font-mono">{AGENT_FOOTNOTE}</p>
     </div>
 
     <!-- Pricing -->
     <div>
-      <h3 class="text-[16px] leading-normal font-medium text-slate-300 mb-3 font-mono">[ Pricing — USD per 1M tokens ]</h3>
+      <h3 class="text-[16px] leading-normal font-medium text-slate-300 mb-3 font-mono">[ Pricing — USD per 1M tokens, as of 2026-07-13 ]</h3>
       <div class="overflow-x-auto">
         <table class="w-full border border-slate-800 rounded-none font-mono text-xs">
           <thead>
             <tr class="bg-slate-900/60 border-b border-slate-800">
               <th class="text-left px-3 py-2 text-slate-500 font-normal">Model</th>
-              <th class="text-right px-3 py-2 text-slate-500 font-normal w-24">Input $</th>
-              <th class="text-right px-3 py-2 text-slate-500 font-normal w-24">Output $</th>
+              <th class="text-right px-3 py-2 text-slate-500 font-normal w-20">Input $</th>
+              <th class="text-right px-3 py-2 text-slate-500 font-normal w-20">Output $</th>
             </tr>
           </thead>
           <tbody>
             {#each PRICING as row, i}
               <tr class="border-b border-slate-800/50 {i % 2 === 1 ? 'bg-slate-900/20' : ''}">
-                <td class="px-3 py-2 text-slate-300">{row.model}</td>
-                <td class="px-3 py-2 text-right text-slate-400">${row.inputPrice.toFixed(3)}</td>
+                <td class="px-3 py-2 text-slate-300">
+                  {#if row.source}
+                    <a href={row.source} target="_blank" rel="noopener" class="hover:text-emerald-400 transition-colors">{row.model}</a>
+                  {:else}
+                    {row.model}
+                  {/if}
+                </td>
+                <td class="px-3 py-2 text-right text-slate-400">${row.inputPrice.toFixed(2)}</td>
                 <td class="px-3 py-2 text-right text-slate-400">${row.outputPrice.toFixed(2)}</td>
               </tr>
+              {#if row.note}
+                <tr class="{i % 2 === 1 ? 'bg-slate-900/20' : ''}">
+                  <td colspan="3" class="px-3 py-1 text-slate-600 text-[9px] font-mono">{row.note}</td>
+                </tr>
+              {/if}
             {/each}
           </tbody>
         </table>
@@ -72,8 +84,9 @@
 
       <!-- Independence note -->
       <p class="mt-4 text-slate-600 text-[10px] font-mono leading-relaxed">
-        Implementation model (DeepSeek) ≠ all evaluator models (Anthropic, Google).
-        No model reviews its own output.
+        The harness routes implementation and evaluation through distinct roles.
+        In this alpha, 3 of 6 agent roles are live LLM agents and the remaining
+        evaluator roles are stubbed or deterministic placeholders.
       </p>
     </div>
   </div>

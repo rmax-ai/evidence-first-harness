@@ -1,6 +1,6 @@
 <script lang="ts">
   import Section from "$lib/components/ui/Section.svelte";
-  import { METRICS, PRINCIPLE, PROJECT } from "$lib/data/meta";
+  import { METRICS, PRINCIPLE, PROJECT, STATUS_LINE, STATUS_CAVEAT } from "$lib/data/meta";
   import { base } from "$app/paths";
 </script>
 
@@ -9,9 +9,7 @@
     <!-- Status line -->
     <div class="flex items-center gap-2 font-mono text-xs text-slate-500">
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-      <span>Alpha · Phase 6 complete</span>
-      <span class="text-slate-700">·</span>
-      <span>{PROJECT.version}</span>
+      <span>{STATUS_LINE}</span>
     </div>
 
     <!-- Title -->
@@ -21,9 +19,9 @@
 
     <!-- Subtitle -->
     <p class="text-slate-400 text-sm leading-relaxed max-w-xl">
-      Deterministic assurance system for AI-generated code.
+      Deterministic assurance for AI-generated code.
       Treats every AI patch as an untrusted proposal —
-      produces validated <span class="text-emerald-400">Evidence Bundles</span>.
+      routes outputs through <a href="{PROJECT.repo}" class="text-emerald-400 hover:underline">deterministic policy gates</a> that produce evidence bundles.
     </p>
 
     <!-- Principle quote -->
@@ -34,7 +32,7 @@
     <!-- CTAs -->
     <div class="flex gap-3 pt-2">
       <a href="{base}/#smoke-test" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded-sm hover:bg-emerald-500/20 transition-colors">
-        ▸ Run Smoke Test
+        ▸ See Smoke Test
       </a>
       <a href={PROJECT.repo} target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 text-slate-400 text-xs font-mono rounded-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
         GitHub ↗
@@ -44,11 +42,12 @@
     <!-- Metrics row -->
     <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-8">
       {#each METRICS as m}
-        <div class="border border-slate-800 rounded-sm p-3 text-center">
+        <a href={m.source} target="_blank" rel="noopener" class="border border-slate-800 rounded-sm p-3 text-center hover:border-slate-600 transition-colors block no-underline">
           <div class="text-lg font-mono font-medium text-white">{m.label}</div>
           <div class="text-[10px] text-slate-500 font-mono mt-0.5">{m.desc}</div>
-        </div>
+        </a>
       {/each}
     </div>
+    <p class="text-slate-600 text-[10px] font-mono">{STATUS_CAVEAT}</p>
   </div>
 </Section>
