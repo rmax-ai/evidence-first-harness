@@ -11,6 +11,8 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
 @dataclass
 class ImportInfo:
     """A single import statement in a module."""
@@ -255,7 +257,9 @@ def _extract_method(
     )
 
 
-def _extract_calls(node: ast.FunctionDef | ast.AsyncFunctionDef, caller_name: str) -> list[CallInfo]:
+def _extract_calls(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, caller_name: str
+) -> list[CallInfo]:
     calls: list[CallInfo] = []
     for child in ast.walk(node):
         if isinstance(child, ast.Call):

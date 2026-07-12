@@ -11,7 +11,6 @@ Section 13 of the Evidence-First Harness specification.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import structlog
 
@@ -20,10 +19,9 @@ from evidence_first_harness.impact.coverage_map import CoverageMap
 from evidence_first_harness.impact.graph import DependencyGraph
 from evidence_first_harness.impact.python_ast import (
     ModuleInfo,
-    extract_changed_symbols,
     parse_directory,
 )
-from evidence_first_harness.impact.test_selector import TestSelection, TestSelector
+from evidence_first_harness.impact.test_selector import TestSelector
 
 logger = structlog.get_logger()
 
@@ -94,14 +92,10 @@ class ImpactAnalyzer:
         confidence = test_selection.confidence
 
         # Identify affected interfaces (public symbols in changed modules)
-        affected_interfaces = self._find_affected_interfaces(
-            changed_files, modules, graph
-        )
+        affected_interfaces = self._find_affected_interfaces(changed_files, modules, graph)
 
         # Identify affected data models (dataclasses, Pydantic models)
-        affected_data_models = self._find_affected_data_models(
-            changed_files, modules
-        )
+        affected_data_models = self._find_affected_data_models(changed_files, modules)
 
         return ImpactReport(
             changed_files=changed_files,
@@ -156,9 +150,7 @@ class ImpactAnalyzer:
                         import subprocess
                         import tempfile
 
-                        with tempfile.NamedTemporaryFile(
-                            suffix=".json", delete=False
-                        ) as tmp:
+                        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
                             tmp_path = Path(tmp.name)
 
                         subprocess.run(

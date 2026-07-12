@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
 
 
 @dataclass
@@ -43,7 +42,7 @@ class CoverageMap:
     available: bool = False
 
     @classmethod
-    def from_json(cls, json_path: Path) -> "CoverageMap":
+    def from_json(cls, json_path: Path) -> CoverageMap:
         """Parse a coverage.py JSON report.
 
         Args:
@@ -91,7 +90,7 @@ class CoverageMap:
         )
 
     @classmethod
-    def empty(cls) -> "CoverageMap":
+    def empty(cls) -> CoverageMap:
         """Return an empty coverage map for when no data is available."""
         return cls(available=False)
 
@@ -110,9 +109,7 @@ class CoverageMap:
                 return fc
         return self.files.get(file_path)
 
-    def symbols_covered(
-        self, file_path: str, symbol_lines: dict[str, int]
-    ) -> dict[str, bool]:
+    def symbols_covered(self, file_path: str, symbol_lines: dict[str, int]) -> dict[str, bool]:
         """Check which symbols are covered by tests.
 
         Args:
@@ -124,9 +121,6 @@ class CoverageMap:
         """
         fc = self.get_coverage(file_path)
         if fc is None:
-            return {name: False for name in symbol_lines}
+            return dict.fromkeys(symbol_lines, False)
 
-        return {
-            name: lineno in fc.covered_lines
-            for name, lineno in symbol_lines.items()
-        }
+        return {name: lineno in fc.covered_lines for name, lineno in symbol_lines.items()}

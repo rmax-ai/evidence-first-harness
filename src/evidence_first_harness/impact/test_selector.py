@@ -12,6 +12,7 @@ import subprocess
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from evidence_first_harness.impact.coverage_map import CoverageMap
 from evidence_first_harness.impact.graph import DependencyGraph
 
@@ -185,10 +186,14 @@ class TestSelector:
         unknown: list[str] = []
 
         if confidence < 0.5:
-            unknown.append(f"Low confidence ({confidence:.2f}) in test selection for {len(changed_files)} changed files")
+            unknown.append(
+                f"Low confidence ({confidence:.2f}) in test selection for {len(changed_files)} changed files"
+            )
 
         if not self._coverage.available:
-            unknown.append("No coverage data available — test selection based on static analysis only")
+            unknown.append(
+                "No coverage data available — test selection based on static analysis only"
+            )
 
         # Check for untested changed files
         files_with_tests: set[str] = set()

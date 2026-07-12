@@ -20,7 +20,6 @@ def inspect_repository(path: str, tool_context: Any = None) -> dict[str, Any]:
     Returns:
         Dict with files, directories, and language breakdown.
     """
-    import os
     from pathlib import Path
 
     repo_path = Path(path)
@@ -86,9 +85,7 @@ def read_source_file(
         return {"error": str(e)}
 
 
-def search_symbols(
-    query: str, tool_context: ToolContext | None = None
-) -> list[dict[str, str]]:
+def search_symbols(query: str, tool_context: ToolContext | None = None) -> list[dict[str, str]]:
     """Search for symbols (functions, classes) in the repository.
 
     Args:
@@ -98,7 +95,6 @@ def search_symbols(
         List of matching symbols with file and line info.
     """
     import subprocess
-    from pathlib import Path
 
     # Use grep to find Python definitions
     try:
@@ -113,11 +109,13 @@ def search_symbols(
             if ":" in line:
                 parts = line.split(":", 2)
                 if len(parts) >= 3:
-                    matches.append({
-                        "file": parts[0],
-                        "line": parts[1],
-                        "content": parts[2].strip(),
-                    })
+                    matches.append(
+                        {
+                            "file": parts[0],
+                            "line": parts[1],
+                            "content": parts[2].strip(),
+                        }
+                    )
         return matches
     except Exception as e:
         return [{"error": str(e)}]

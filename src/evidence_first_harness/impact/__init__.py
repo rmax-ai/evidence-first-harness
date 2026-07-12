@@ -13,17 +13,22 @@ Public API:
 from evidence_first_harness.impact.analyzer import ImpactAnalyzer
 from evidence_first_harness.impact.coverage_map import CoverageMap
 from evidence_first_harness.impact.graph import DependencyGraph
-from evidence_first_harness.impact.python_ast import ModuleInfo, SymbolInfo, parse_directory, parse_module
+from evidence_first_harness.impact.python_ast import (
+    ModuleInfo,
+    SymbolInfo,
+    parse_directory,
+    parse_module,
+)
 from evidence_first_harness.impact.test_selector import TestSelection, TestSelector
 
 __all__ = [
+    "CoverageMap",
+    "DependencyGraph",
     "ImpactAnalyzer",
-    "TestSelection",
-    "TestSelector",
     "ModuleInfo",
     "SymbolInfo",
-    "DependencyGraph",
-    "CoverageMap",
+    "TestSelection",
+    "TestSelector",
     "parse_directory",
     "parse_module",
 ]

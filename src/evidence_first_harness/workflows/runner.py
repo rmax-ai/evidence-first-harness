@@ -6,22 +6,19 @@ executor dispatch, evidence collection, decision rendering, and bundle creation.
 
 from __future__ import annotations
 
-import asyncio
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
 
 from evidence_first_harness.artifacts.store import ArtifactStore
 from evidence_first_harness.callbacks.provenance import ProvenanceRecorder
-from evidence_first_harness.domain.decision import Decision
 from evidence_first_harness.domain.evidence import (
     EvidenceBundle,
     EvidenceRecord,
     EvidenceRequirement,
 )
-from evidence_first_harness.domain.exceptions import EvidenceError
 from evidence_first_harness.domain.risk import RiskAssessment, RiskDimension
 from evidence_first_harness.domain.specification import CompiledSpecification
 from evidence_first_harness.evidence.bundle import BundleBuilder
@@ -50,9 +47,7 @@ class EvidenceRunner:
         self._planner = EvidencePlanner(self._policy)
         self._artifacts = ArtifactStore(artifact_dir)
         self._run_id = f"run_{uuid.uuid4().hex[:12]}"
-        self._provenance = ProvenanceRecorder(
-            self._run_id, Path(artifact_dir) / "provenance"
-        )
+        self._provenance = ProvenanceRecorder(self._run_id, Path(artifact_dir) / "provenance")
 
     @property
     def run_id(self) -> str:
@@ -254,54 +249,63 @@ class EvidenceRunner:
         # Import all known executors
         try:
             from evidence_first_harness.evidence.executors.ruff import RuffExecutor
+
             executors.append(RuffExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.pyright import PyrightExecutor
+
             executors.append(PyrightExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.pytest import PytestExecutor
+
             executors.append(PytestExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.coverage import CoverageExecutor
+
             executors.append(CoverageExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.semgrep import SemgrepExecutor
+
             executors.append(SemgrepExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.secrets import SecretScanExecutor
+
             executors.append(SecretScanExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.dependency import DependencyExecutor
+
             executors.append(DependencyExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.mutation import MutationExecutor
+
             executors.append(MutationExecutor())
         except ImportError:
             pass
 
         try:
             from evidence_first_harness.evidence.executors.gitdiff import GitDiffExecutor
+
             executors.append(GitDiffExecutor())
         except ImportError:
             pass

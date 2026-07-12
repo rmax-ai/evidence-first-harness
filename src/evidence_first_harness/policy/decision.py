@@ -62,9 +62,7 @@ class DecisionEngine:
         approval_roles = approval_roles or []
         approved_roles = approved_roles or []
 
-        records_by_id: dict[str, EvidenceRecord] = {
-            r.requirement_id: r for r in evidence_records
-        }
+        records_by_id: dict[str, EvidenceRecord] = {r.requirement_id: r for r in evidence_records}
 
         # Classify evidence
         failed: list[str] = []
@@ -124,7 +122,8 @@ class DecisionEngine:
             decision=decision,
             rationale=rationale,
             risk_tier=risk.overall_tier,
-            mandatory_evidence_passed=len(mandatory_failed) == 0 and len(mandatory_unavailable) == 0,
+            mandatory_evidence_passed=len(mandatory_failed) == 0
+            and len(mandatory_unavailable) == 0,
             mandatory_evidence_count=mandatory_passed_count,
             mandatory_evidence_failed=mandatory_failed,
             mandatory_evidence_unavailable=mandatory_unavailable,
@@ -146,7 +145,6 @@ class DecisionEngine:
         approved_roles: list[str],
     ) -> Decision:
         """Route to the correct decision based on deterministic rules."""
-
         # Repair logic
         if has_mandatory_failed:
             if repair_attempts < max_repair_attempts:

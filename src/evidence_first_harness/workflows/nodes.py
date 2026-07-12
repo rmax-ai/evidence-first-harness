@@ -6,28 +6,18 @@ services, updates state, and returns a NodeStatus for routing.
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import structlog
 
-from evidence_first_harness.agents.adversarial_review import (
-    create_adversarial_review_agent,
-)
-from evidence_first_harness.agents.explanation import create_explanation_agent
 from evidence_first_harness.agents.implementation import create_implementation_agent
-from evidence_first_harness.agents.independent_tests import (
-    create_independent_test_agent,
-)
 from evidence_first_harness.agents.planner import create_planner_agent
 from evidence_first_harness.agents.specification import create_specification_agent
 from evidence_first_harness.artifacts.store import ArtifactStore
 from evidence_first_harness.callbacks.provenance import ProvenanceRecorder
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
-from evidence_first_harness.domain.impact import ImpactReport
 from evidence_first_harness.domain.risk import RiskAssessment
 from evidence_first_harness.evidence.bundle import BundleBuilder
 from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext

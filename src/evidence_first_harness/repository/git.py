@@ -35,9 +35,7 @@ class RepositoryManager:
 
         git_dir = self._repo_path / ".git"
         if not git_dir.exists():
-            raise RepositoryError(
-                f"Not a Git repository (no .git directory): {self._repo_path}"
-            )
+            raise RepositoryError(f"Not a Git repository (no .git directory): {self._repo_path}")
 
     @property
     def repo_path(self) -> Path:
@@ -129,9 +127,7 @@ class RepositoryManager:
             normalized.append(line)
         return "\n".join(normalized)
 
-    def _run_git(
-        self, args: list[str], cwd: Path | None = None, timeout: int = 30
-    ) -> str:
+    def _run_git(self, args: list[str], cwd: Path | None = None, timeout: int = 30) -> str:
         """Run a git command and return stdout."""
         cmd = ["git"] + args
         try:
@@ -147,9 +143,7 @@ class RepositoryManager:
         except subprocess.TimeoutExpired as e:
             raise RepositoryError(f"Git command timed out: {' '.join(args)}") from e
         except subprocess.CalledProcessError as e:
-            raise RepositoryError(
-                f"Git command failed: {' '.join(args)}\n{e.stderr}"
-            ) from e
+            raise RepositoryError(f"Git command failed: {' '.join(args)}\n{e.stderr}") from e
 
 
 class Worktree:

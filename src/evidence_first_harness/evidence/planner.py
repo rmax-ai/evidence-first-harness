@@ -99,10 +99,19 @@ class EvidencePlanner:
         """Classify a check's independence level."""
         # All Phase 1 checks are deterministic (static analysis, test execution)
         deterministic_checks = {
-            "formatting", "lint", "type_check", "targeted_tests",
-            "integration_tests", "security_scan", "secret_scan",
-            "dependency_scan", "mutation_test", "performance_check",
-            "rollback_check", "contract_tests", "git_validation",
+            "formatting",
+            "lint",
+            "type_check",
+            "targeted_tests",
+            "integration_tests",
+            "security_scan",
+            "secret_scan",
+            "dependency_scan",
+            "mutation_test",
+            "performance_check",
+            "rollback_check",
+            "contract_tests",
+            "git_validation",
         }
         if check_id in deterministic_checks:
             return "deterministic"

@@ -130,7 +130,9 @@ def evidence_verify(bundle: str) -> None:
 
 @main.command()
 @click.option("--run-id", required=True, help="Run ID to approve")
-@click.option("--decision", required=True, type=click.Choice(["approve", "reject", "request_changes"]))
+@click.option(
+    "--decision", required=True, type=click.Choice(["approve", "reject", "request_changes"])
+)
 def approve(run_id: str, decision: str) -> None:
     """Submit a human approval decision for a run."""
     click.echo(f"Submitting {decision} for run {run_id}...")

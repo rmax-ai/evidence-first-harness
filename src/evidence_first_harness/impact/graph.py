@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from evidence_first_harness.impact.python_ast import ModuleInfo
 
 
@@ -46,7 +47,7 @@ class DependencyGraph:
     _symbol_to_file: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, modules: dict[str, ModuleInfo]) -> "DependencyGraph":
+    def build(cls, modules: dict[str, ModuleInfo]) -> DependencyGraph:
         """Build a dependency graph from a module snapshot.
 
         Args:

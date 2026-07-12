@@ -147,7 +147,10 @@ def _redact_secrets(text: str) -> str:
         (r"sk-[a-zA-Z0-9]{20,}", "[REDACTED_API_KEY]"),
         (r"AIza[0-9A-Za-z_-]{35}", "[REDACTED_GEMINI_KEY]"),
         (r"ghp_[a-zA-Z0-9]{36}", "[REDACTED_GITHUB_TOKEN]"),
-        (r'(["\']?(?:password|secret|token|api_key|apikey)["\']?\s*[:=]\s*["\']?)([^"\'\\s]{6,})', r"\1[REDACTED]"),
+        (
+            r'(["\']?(?:password|secret|token|api_key|apikey)["\']?\s*[:=]\s*["\']?)([^"\'\\s]{6,})',
+            r"\1[REDACTED]",
+        ),
     ]
 
     for pattern, replacement in patterns:
@@ -163,7 +166,11 @@ def _is_tool_allowed(agent_role: str, tool_name: str) -> bool:
     """
     # Phase 2 default allowlists
     common_tools = {"inspect_repository", "read_source_file", "search_symbols", "store_artifact"}
-    implementation_tools = common_tools | {"apply_patch", "run_allowed_command", "get_test_selection"}
+    implementation_tools = common_tools | {
+        "apply_patch",
+        "run_allowed_command",
+        "get_test_selection",
+    }
     read_only_tools = common_tools - {"store_artifact"}  # spec/planner/adversarial can't store
 
     role_allowlists = {

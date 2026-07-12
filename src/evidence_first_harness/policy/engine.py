@@ -12,7 +12,7 @@ from typing import Any
 import structlog
 import yaml
 
-from evidence_first_harness.domain.evidence import EvidenceRequirement, EvidenceRecord
+from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
 from evidence_first_harness.domain.exceptions import PolicyError
 
 logger = structlog.get_logger()
@@ -195,9 +195,7 @@ class PolicyEngine:
 
             if record.status == "pass":
                 passed.append(req_id)
-            elif record.status == "fail":
-                failed.append(req_id)
-            elif record.status == "error":
+            elif record.status == "fail" or record.status == "error":
                 failed.append(req_id)
             elif record.status == "unavailable":
                 unavailable.append(req_id)

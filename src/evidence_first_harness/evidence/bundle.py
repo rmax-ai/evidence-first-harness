@@ -7,12 +7,10 @@ decisions, and provenance into a single verifiable EvidenceBundle.
 from __future__ import annotations
 
 import json
-from datetime import datetime, UTC
 from pathlib import Path
 
 import structlog
 
-from evidence_first_harness.domain.decision import DecisionResult
 from evidence_first_harness.domain.evidence import (
     EvidenceBundle,
     EvidenceRecord,
@@ -109,9 +107,7 @@ class BundleBuilder:
                 impact_confidence=impact_confidence,
                 contradictions=contradictions,
                 repair_attempts=repair_attempts,
-                max_repair_attempts=self._policy.get_retry_policy()[
-                    "evidence_repair_attempts"
-                ],
+                max_repair_attempts=self._policy.get_retry_policy()["evidence_repair_attempts"],
                 approval_roles=approval_roles,
                 approved_roles=approved_roles,
             )
@@ -226,7 +222,7 @@ th {{ background: #e9ecef; }}
 
 <h2>Decision</h2>
 <div class="decision decision-{decision}">
-Decision: <strong>{decision.upper().replace('_', ' ')}</strong>
+Decision: <strong>{decision.upper().replace("_", " ")}</strong>
 <br>Risk Tier: {risk_tier}
 </div>
 

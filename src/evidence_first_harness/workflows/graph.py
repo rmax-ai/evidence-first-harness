@@ -153,9 +153,7 @@ class EvidenceGraph:
             The next node name, or None if terminal.
         """
         if current_node not in self._node_map:
-            logger.warning(
-                "unknown_node", node=current_node, run_id=self._state.run_id
-            )
+            logger.warning("unknown_node", node=current_node, run_id=self._state.run_id)
             return None
 
         _, transitions = self._node_map[current_node]
