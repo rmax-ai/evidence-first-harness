@@ -158,8 +158,11 @@ def benchmark() -> None:
 @click.argument("config_path", type=click.Path(exists=True))
 def benchmark_run(config_path: str) -> None:
     """Run a benchmark experiment."""
-    click.echo(f"Running benchmark: {config_path}")
-    click.echo("(Phase 4 — not yet implemented)")
+    from evidence_first_harness.benchmarks import BenchmarkRunner
+
+    runner = BenchmarkRunner(config_path)
+    report = runner.run()
+    runner.print_summary(report)
 
 
 @main.group()

@@ -1,0 +1,121 @@
+# Research Benchmark Configuration
+# Evidence-First Harness — Section 25-26 of the spec
+#
+# Defines benchmark scenarios with seeded defects for evaluating
+# the harness's detection capabilities against conventional workflows.
+
+version: "1.0"
+
+# Default paths (relative to benchmark config or absolute)
+paths:
+  work_dir: "benchmarks/work"
+  reports_dir: "benchmarks/reports"
+  datasets_dir: "benchmarks/datasets"
+
+# Experiment conditions (A-E from Section 25.2)
+conditions:
+  A:
+    name: "Agent-selected tests only"
+    description: "Coding agent chooses and runs its own tests"
+    harness_policy: tier_3_minimal
+  B:
+    name: "Agent plus conventional CI"
+    description: "Coding agent plus conventional full CI"
+    harness_policy: tier_2_standard
+  C:
+    name: "Impact-derived targeted evidence"
+    description: "Dependency-selected tests based on impact analysis"
+    harness_policy: tier_2_standard
+  D:
+    name: "Impact-derived plus mutation testing"
+    description: "Dependency-selected tests plus mutation testing"
+    harness_policy: tier_2_mutation
+  E:
+    name: "Impact-derived plus independent test agent"
+    description: "Dependency-selected tests plus independently generated tests"
+    harness_policy: tier_1_full
+
+# Primary metrics (Section 25.2)
+metrics:
+  - escaped_defect_rate
+  - defect_detection_recall
+  - false_positive_rate
+  - mutation_score
+  - evidence_execution_cost_seconds
+  - wall_clock_latency_seconds
+  - human_review_time_seconds
+  - reviewer_defect_detection_rate
+  - decision_calibration
+  - proportion_of_claims_linked_to_evidence
+
+# Seeded defect scenarios
+scenarios:
+  - id: "SD-001"
+    name: "Incorrect boundary condition"
+    category: "functional"
+    description: "Off-by-one error in loop boundary"
+    expected_failure: true
+    detection_requires: ["targeted_tests", "mutation_test"]
+
+  - id: "SD-002"
+    name: "Authorization bypass"
+    category: "security"
+    description: "Missing permission check on admin endpoint"
+    expected_failure: true
+    detection_requires: ["security_scan", "independent_test"]
+
+  - id: "SD-003"
+    name: "Missing transaction rollback"
+    category: "data_integrity"
+    description: "Error during payment doesn't rollback ledger entry"
+    expected_failure: true
+    detection_requires: ["integration_tests", "mutation_test"]
+
+  - id: "SD-004"
+    name: "Race condition in counter"
+    category: "concurrency"
+    description: "Non-atomic increment leads to duplicate IDs"
+    expected_failure: true
+    detection_requires: ["independent_test", "mutation_test"]
+
+  - id: "SD-005"
+    name: "Insecure deserialization"
+    category: "security"
+    description: "pickle.loads on user-supplied data"
+    expected_failure: true
+    detection_requires: ["security_scan", "dependency_scan"]
+
+  - id: "SD-006"
+    name: "Dependency vulnerability"
+    category: "supply_chain"
+    description: "Known CVE in pinned dependency version"
+    expected_failure: true
+    detection_requires: ["dependency_scan"]
+
+  - id: "SD-007"
+    name: "Incorrect exception handling"
+    category: "functional"
+    description: "Bare except clause swallows critical error"
+    expected_failure: true
+    detection_requires: ["lint", "independent_test"]
+
+  - id: "SD-008"
+    name: "Performance regression"
+    category: "performance"
+    description: "O(n^2) loop added to hot path"
+    expected_failure: true
+    detection_requires: ["mutation_test", "integration_tests"]
+
+  - id: "SD-009"
+    name: "Architectural boundary violation"
+    category: "architecture"
+    description: "Domain logic import in infrastructure layer"
+    expected_failure: true
+    detection_requires: ["lint", "type_check"]
+
+  - id: "SD-010"
+    name: "Test encoding same bug as implementation"
+    category: "false_negative"
+    description: "Test asserts wrong expected value matching buggy code"
+    expected_failure: true
+    detection_requires: ["mutation_test", "independent_test"]

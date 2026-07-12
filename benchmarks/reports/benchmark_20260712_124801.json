@@ -1,0 +1,669 @@
+{
+  "config": "benchmarks/configs/template.yaml",
+  "conditions": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "total_scenarios": 50,
+  "escaped_defect_rate": 0.2,
+  "defect_detection_recall": 0.8,
+  "false_positive_rate": 0.0,
+  "avg_mutation_score": 0.0,
+  "avg_execution_time": 3.4894421696662905e-06,
+  "avg_evidence_count": 1.16,
+  "per_condition": {
+    "A": {
+      "scenarios": 10,
+      "escaped_defects": 7,
+      "escaped_rate": 0.7,
+      "avg_confidence": 0.2
+    },
+    "B": {
+      "scenarios": 10,
+      "escaped_defects": 1,
+      "escaped_rate": 0.1,
+      "avg_confidence": 0.65
+    },
+    "C": {
+      "scenarios": 10,
+      "escaped_defects": 1,
+      "escaped_rate": 0.1,
+      "avg_confidence": 0.65
+    },
+    "D": {
+      "scenarios": 10,
+      "escaped_defects": 1,
+      "escaped_rate": 0.1,
+      "avg_confidence": 0.65
+    },
+    "E": {
+      "scenarios": 10,
+      "escaped_defects": 0,
+      "escaped_rate": 0.0,
+      "avg_confidence": 0.8
+    }
+  },
+  "results": [
+    {
+      "scenario_id": "SD-001",
+      "scenario_name": "Incorrect boundary condition",
+      "condition": "A",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "targeted_tests"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-001",
+      "scenario_name": "Incorrect boundary condition",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test",
+        "targeted_tests"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-001",
+      "scenario_name": "Incorrect boundary condition",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test",
+        "targeted_tests"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-001",
+      "scenario_name": "Incorrect boundary condition",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test",
+        "targeted_tests"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-001",
+      "scenario_name": "Incorrect boundary condition",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test",
+        "targeted_tests"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-002",
+      "scenario_name": "Authorization bypass",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'independent_test', 'security_scan'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-002",
+      "scenario_name": "Authorization bypass",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-002",
+      "scenario_name": "Authorization bypass",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-002",
+      "scenario_name": "Authorization bypass",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-002",
+      "scenario_name": "Authorization bypass",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-003",
+      "scenario_name": "Missing transaction rollback",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'integration_tests', 'mutation_test'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-003",
+      "scenario_name": "Missing transaction rollback",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-003",
+      "scenario_name": "Missing transaction rollback",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-003",
+      "scenario_name": "Missing transaction rollback",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-003",
+      "scenario_name": "Missing transaction rollback",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-004",
+      "scenario_name": "Race condition in counter",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'independent_test', 'mutation_test'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-004",
+      "scenario_name": "Race condition in counter",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-004",
+      "scenario_name": "Race condition in counter",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-004",
+      "scenario_name": "Race condition in counter",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-004",
+      "scenario_name": "Race condition in counter",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-005",
+      "scenario_name": "Insecure deserialization",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'dependency_scan', 'security_scan'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-005",
+      "scenario_name": "Insecure deserialization",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-005",
+      "scenario_name": "Insecure deserialization",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-005",
+      "scenario_name": "Insecure deserialization",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "security_scan"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-005",
+      "scenario_name": "Insecure deserialization",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "dependency_scan",
+        "security_scan"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-006",
+      "scenario_name": "Dependency vulnerability",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'dependency_scan'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-006",
+      "scenario_name": "Dependency vulnerability",
+      "condition": "B",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'dependency_scan'}, but condition B only provides {'lint', 'integration_tests', 'formatting', 'mutation_test', 'targeted_tests', 'type_check', 'security_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-006",
+      "scenario_name": "Dependency vulnerability",
+      "condition": "C",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'dependency_scan'}, but condition C only provides {'lint', 'integration_tests', 'formatting', 'mutation_test', 'targeted_tests', 'type_check', 'security_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-006",
+      "scenario_name": "Dependency vulnerability",
+      "condition": "D",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'dependency_scan'}, but condition D only provides {'lint', 'integration_tests', 'formatting', 'mutation_test', 'targeted_tests', 'type_check', 'security_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-006",
+      "scenario_name": "Dependency vulnerability",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "dependency_scan"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-007",
+      "scenario_name": "Incorrect exception handling",
+      "condition": "A",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-007",
+      "scenario_name": "Incorrect exception handling",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-007",
+      "scenario_name": "Incorrect exception handling",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-007",
+      "scenario_name": "Incorrect exception handling",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-007",
+      "scenario_name": "Incorrect exception handling",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-008",
+      "scenario_name": "Performance regression",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'integration_tests', 'mutation_test'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-008",
+      "scenario_name": "Performance regression",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-008",
+      "scenario_name": "Performance regression",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-008",
+      "scenario_name": "Performance regression",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-008",
+      "scenario_name": "Performance regression",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "integration_tests",
+        "mutation_test"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-009",
+      "scenario_name": "Architectural boundary violation",
+      "condition": "A",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint",
+        "type_check"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-009",
+      "scenario_name": "Architectural boundary violation",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint",
+        "type_check"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-009",
+      "scenario_name": "Architectural boundary violation",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint",
+        "type_check"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-009",
+      "scenario_name": "Architectural boundary violation",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint",
+        "type_check"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-009",
+      "scenario_name": "Architectural boundary violation",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "lint",
+        "type_check"
+      ],
+      "confidence": 1.0,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-010",
+      "scenario_name": "Test encoding same bug as implementation",
+      "condition": "A",
+      "defect_detected": false,
+      "escaped": true,
+      "detection_evidence": [],
+      "confidence": 0.0,
+      "errors": [
+        "Defect escaped: requires {'independent_test', 'mutation_test'}, but condition A only provides {'lint', 'formatting', 'targeted_tests', 'type_check', 'secret_scan'}"
+      ]
+    },
+    {
+      "scenario_id": "SD-010",
+      "scenario_name": "Test encoding same bug as implementation",
+      "condition": "B",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-010",
+      "scenario_name": "Test encoding same bug as implementation",
+      "condition": "C",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-010",
+      "scenario_name": "Test encoding same bug as implementation",
+      "condition": "D",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    },
+    {
+      "scenario_id": "SD-010",
+      "scenario_name": "Test encoding same bug as implementation",
+      "condition": "E",
+      "defect_detected": true,
+      "escaped": false,
+      "detection_evidence": [
+        "mutation_test"
+      ],
+      "confidence": 0.5,
+      "errors": []
+    }
+  ]
+}
