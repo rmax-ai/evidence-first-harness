@@ -35,11 +35,11 @@ export const STATUS_CAVEAT =
   "Repository metrics reflect the current public repository state at the time of publication and may change.";
 
 export const METRICS = [
-  { label: "73", desc: "Unit tests", source: `${PROJECT.repo}` },
+  { label: "85", desc: "Unit tests", source: `${PROJECT.repo}` },
   { label: "MIT", desc: "License", source: `${PROJECT.repo}/blob/main/LICENSE` },
   { label: "3/6", desc: "LLM agents live", source: `${PROJECT.repo}` },
   { label: "9", desc: "Evidence executors", source: `${PROJECT.repo}` },
-  { label: "~$0.128", desc: "Est. cost/run", source: `${PROJECT.repo}#smoke-test` },
+  { label: "$0.505", desc: "Recorded run", source: `${PROJECT.repo}#smoke-test` },
   { label: "17", desc: "Workflow nodes", source: `${PROJECT.repo}` },
 ];
 
@@ -53,15 +53,15 @@ export interface AgentRow {
 }
 
 export const AGENT_ROUTING: AgentRow[] = [
-  { agent: "Specification", model: "claude-sonnet-5", provider: "Anthropic", live: true, inTokens: 294, outTokens: 4096 },
-  { agent: "Planner", model: "claude-opus-4-6", provider: "Anthropic", live: true, inTokens: 430, outTokens: 770 },
-  { agent: "Implementation", model: "gpt-5.6-terra", provider: "OpenAI", live: true, inTokens: 276, outTokens: 34 },
+  { agent: "Specification", model: "claude-sonnet-5", provider: "Anthropic", live: true, inTokens: 13570, outTokens: 4096 },
+  { agent: "Planner", model: "claude-opus-4-6", provider: "Anthropic", live: true, inTokens: 11871, outTokens: 2015 },
+  { agent: "Implementation", model: "gpt-5.6-terra", provider: "OpenAI", live: true, inTokens: 11393, outTokens: 3007 },
   { agent: "Independent Test", model: "claude-haiku-4-5", provider: "Anthropic", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Adversarial Review", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Explanation", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
 ];
 
-export const AGENT_FOOTNOTE = "Implementation proposals use strict JSON Schema Structured Outputs; the harness validates and applies the returned unified diff.";
+export const AGENT_FOOTNOTE = "Recorded in run_c6ec67e305e0. Implementation proposals use strict JSON Schema Structured Outputs; the harness validates and applies the returned unified diff.";
 
 export interface PricingRow {
   model: string;
@@ -147,49 +147,45 @@ export const TIERS: TierRow[] = [
 export const QUICK_START = [
   { cmd: "git clone https://github.com/rmax-ai/evidence-first-harness.git", desc: "Clone the repository" },
   { cmd: "cd evidence-first-harness && uv sync --extra dev", desc: "Install dependencies" },
-  { cmd: "uv run pytest tests/ -q", desc: "Run 73 tests in ~4 seconds" },
+  { cmd: "uv run pytest tests/ -q", desc: "Run 85 tests in ~7 seconds" },
   {
     cmd: 'uv run efh run --repo . --task "Add a focused test for the policy engine."',
-    desc: "Full E2E smoke test (~90s)",
+    desc: "Full E2E smoke test (~2 min)",
   },
 ];
 
 // Cost explanation shown below smoke output
 export const SMOKE_CAVEAT =
-  "The transcript below is a representative smoke-test run from the alpha harness. " +
-  "It shows the intended separation of roles: LLM agents produce implementation and review artifacts, " +
-  "while deterministic checks and policy decide the workflow outcome. " +
-  "Exact runtime, token counts, and cost vary with provider pricing, API behavior, cache state, " +
-  "model routing, and repository state. Treat the displayed cost as a run-specific estimate, " +
-  "not a guaranteed current API price.";
+  "This is the recorded output from run_c6ec67e305e0 against commit 233ebbac. " +
+  "It shows LLM agents producing implementation artifacts while deterministic checks and policy " +
+  "make the final decision. Runtime, token counts, and cost vary with provider behavior and repository state.";
 
 export const COST_BREAKDOWN =
-  "Estimated run cost: approximately $0.1277 under current pricing assumptions as of 2026-07-15. " +
-  "This uses Sonnet 5 for specification, Opus 4.6 for planning, and GPT-5.6 Terra for implementation. " +
-  "These estimates exclude hidden/tool overhead and provider-side accounting differences.";
+  "Recorded cost: $0.504927 (36,834 input and 9,118 output tokens). " +
+  "Sonnet 5 compiled the specification, Opus 4.6 planned the implementation, and GPT-5.6 Terra generated the patch.";
 
 export const SMOKE_OUTPUT = `$ efh run --repo . --task "Add a focused test for the policy engine."
 
-workflow_started    run_id=run_3da28c6662d9
-worktree_created    base_commit=9007ebb1
+workflow_started    run_id=run_c6ec67e305e0
+worktree_created    base_commit=233ebbac
 
-specification_agent_call   sonnet-5   in=294   out=4096
-planner_agent_call         opus-4-6   in=430   out=770
-implementation_agent_call  gpt-5.6-terra   in=276   out=34
+specification_agent_call   sonnet-5       in=13570  out=4096
+planner_agent_call         opus-4-6       in=11871  out=2015
+implementation_agent_call  gpt-5.6-terra  in=11393  out=3007
 
 evidence_executed  formatting  ruff     fail
 evidence_executed  lint        ruff     fail
 evidence_executed  type_check  pyright  fail
-evidence_executed  secret_scan secrets  pass
-evidence_executed  tests       pytest   fail
+evidence_executed  secret_scan secrets  fail
+evidence_executed  tests       pytest   pass
 
 decision_rendered  decision=repair_required
   mandatory_failed=4  passed=1  tier=3
 
 │ Agent              Model                  In    Out │
 ├──────────────────┼──────────────────┼──────┼──────┤
-│ specification      claude-sonnet-5       294   4096 │
-│ planner            claude-opus-4-6       430    770 │
-│ implementation     gpt-5.6-terra         276     34 │
+│ specification      claude-sonnet-5     13570   4096 │
+│ planner            claude-opus-4-6     11871   2015 │
+│ implementation     gpt-5.6-terra       11393   3007 │
 ├──────────────────┼──────────────────┼──────┼──────┤
-│ TOTAL                                   1000   4900 │`;
+│ TOTAL                                  36834   9118 │`;

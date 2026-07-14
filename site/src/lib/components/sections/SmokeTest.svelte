@@ -33,7 +33,7 @@
       <div class="border border-slate-800 rounded-sm overflow-hidden">
         <div class="flex items-center justify-between px-3 py-1.5 bg-slate-900/60 border-b border-slate-800">
           <span class="text-slate-500 font-mono text-[10px]">sharn@evidence-harness:~</span>
-          <span class="text-slate-600 font-mono text-[10px]">~90s</span>
+          <span class="text-slate-600 font-mono text-[10px]">~2 min</span>
         </div>
         <div class="relative bg-[#020617] border-l-2 border-emerald-500/60">
           <pre class="text-slate-400 font-mono text-[11px] leading-relaxed p-3 overflow-x-auto"><code>{SMOKE_OUTPUT}</code></pre>
