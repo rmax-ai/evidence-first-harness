@@ -88,7 +88,13 @@ class EvidenceGraph:
                 },
             ),
             "implementation_failure": (None, {}),  # Terminal
-            "analyze_impact": (None, {NodeStatus.SUCCESS: "reclassify_risk"}),
+            "analyze_impact": (
+                None,
+                {
+                    NodeStatus.SUCCESS: "reclassify_risk",
+                    NodeStatus.IMPLEMENTATION_FAILURE: "implementation_failure",
+                },
+            ),
             "reclassify_risk": (None, {NodeStatus.SUCCESS: "compile_evidence_plan"}),
             "compile_evidence_plan": (None, {NodeStatus.SUCCESS: "run_cheap_checks"}),
             "run_cheap_checks": (

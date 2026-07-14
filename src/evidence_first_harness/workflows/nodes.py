@@ -6,6 +6,7 @@ services, updates state, and returns a NodeStatus for routing.
 
 from __future__ import annotations
 
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -241,8 +242,8 @@ async def handle_generate_patch(
 ) -> NodeStatus:
     """Run the implementation agent in the worktree."""
     try:
-        from evidence_first_harness.agents.invoker import call_agent
         from evidence_first_harness.agents.implementation import IMPLEMENTATION_AGENT_PROMPT
+        from evidence_first_harness.agents.invoker import call_agent
 
         result = await call_agent(
             model="deepseek-chat",
@@ -252,10 +253,6 @@ async def handle_generate_patch(
             temperature=0.0,
             max_tokens=8192,
         )
-
-        patch_content = result.text if not result.error else f"# Generated patch (agent error: {result.error[:100]})"
-        ref = artifacts.store("patch", patch_content)
-        state.patch_artifact = ref.artifact_id
 
         from evidence_first_harness.workflows.state import AgentCallRecord, compute_cost
 
@@ -279,6 +276,56 @@ async def handle_generate_patch(
             cost_usd=f"{call_cost:.6f}",
         )
 
+        if result.error:
+            return _record_implementation_failure(
+                state=state,
+                artifacts=artifacts,
+                provenance=provenance,
+                model=result.model,
+                message=f"Implementation agent failed: {result.error}",
+            )
+
+        patch_content = _extract_unified_diff(result.text)
+        if patch_content is None:
+            return _record_implementation_failure(
+                state=state,
+                artifacts=artifacts,
+                provenance=provenance,
+                model=result.model,
+                message="Implementation agent did not return a valid unified diff.",
+            )
+
+        apply_result = subprocess.run(
+            ["git", "apply", "--check", "--whitespace=error-all", "-"],
+            cwd=worktree_path,
+            capture_output=True,
+            input=patch_content,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if apply_result.returncode != 0:
+            detail = apply_result.stderr.strip() or apply_result.stdout.strip()
+            return _record_implementation_failure(
+                state=state,
+                artifacts=artifacts,
+                provenance=provenance,
+                model=result.model,
+                message=f"Generated patch failed validation: {detail or 'git apply rejected it'}",
+            )
+
+        subprocess.run(
+            ["git", "apply", "--whitespace=error-all", "-"],
+            cwd=worktree_path,
+            capture_output=True,
+            input=patch_content,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        ref = artifacts.store("patch", patch_content)
+        state.patch_artifact = ref.artifact_id
+
         provenance.record(
             actor_type="agent",
             actor_id="implementation_agent",
@@ -292,12 +339,63 @@ async def handle_generate_patch(
         )
 
         return NodeStatus.SUCCESS
+    except (OSError, subprocess.SubprocessError) as error:
+        return _record_implementation_failure(
+            state=state,
+            artifacts=artifacts,
+            provenance=provenance,
+            model="deepseek-chat",
+            message=f"Generated patch could not be applied: {error}",
+        )
     except Exception as e:
         state.errors.append(f"implementation: {e}")
         state.repair_attempt += 1
         if state.repair_attempt >= MAX_IMPLEMENTATION_ATTEMPTS:
             return NodeStatus.IMPLEMENTATION_FAILURE
         return NodeStatus.REPAIR_REQUIRED
+
+
+def _extract_unified_diff(agent_output: str) -> str | None:
+    """Return a valid-looking unified diff from an agent response.
+
+    The implementation boundary accepts patch text only. It intentionally does
+    not treat prose, JSON, or an agent error message as a patch.
+    """
+    text = agent_output.strip()
+    if text.startswith("```diff") or text.startswith("```patch"):
+        lines = text.splitlines()
+        text = "\n".join(lines[1:-1]).strip() if lines[-1] == "```" else ""
+
+    lines = text.splitlines()
+    has_file_header = any(line.startswith("diff --git ") for line in lines)
+    has_old_path = any(line.startswith("--- ") for line in lines)
+    has_new_path = any(line.startswith("+++ ") for line in lines)
+    if not text or not (has_file_header and has_old_path and has_new_path):
+        return None
+    return f"{text}\n"
+
+
+def _record_implementation_failure(
+    *,
+    state: WorkflowState,
+    artifacts: ArtifactStore,
+    provenance: ProvenanceRecorder,
+    model: str,
+    message: str,
+) -> NodeStatus:
+    """Persist an implementation failure without representing it as a patch."""
+    ref = artifacts.store("implementation_failure", message)
+    state.errors.append(f"implementation: {message}")
+    state.final_decision = NodeStatus.IMPLEMENTATION_FAILURE.value
+    provenance.record(
+        actor_type="agent",
+        actor_id="implementation_agent",
+        action="generate_patch_failed",
+        model=model,
+        output_data={"artifact_id": ref.artifact_id, "error": message},
+    )
+    logger.warning("implementation_failed", model=model, reason=message)
+    return NodeStatus.IMPLEMENTATION_FAILURE
 
 
 async def handle_analyze_impact(
@@ -321,17 +419,15 @@ async def handle_analyze_impact(
             patch_text = artifacts.retrieve(state.patch_artifact).decode("utf-8")
             for line in patch_text.splitlines():
                 if line.startswith("--- a/") or line.startswith("+++ b/"):
-                    fname = line[6:] if line.startswith("--- a/") else line[6:]
+                    fname = line[6:]
                     if fname.endswith(".py") and "/dev/null" not in fname:
                         changed_files.append(fname)
 
         if not changed_files:
-            # Fallback: list all Python files in worktree
-            changed_files = sorted(
-                str(p.relative_to(worktree_path))
-                for p in worktree_path.rglob("*.py")
-                if p.is_file()
-            )[:20]
+            state.errors.append("impact_analysis: no valid patch artifact is available")
+            state.final_decision = NodeStatus.IMPLEMENTATION_FAILURE.value
+            logger.warning("impact_analysis_skipped", reason="no_valid_patch")
+            return NodeStatus.IMPLEMENTATION_FAILURE
 
         report = analyzer.analyze(
             changed_files=changed_files,
