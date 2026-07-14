@@ -83,6 +83,7 @@ async def call_agent(
     temperature: float = 0.2,
     max_tokens: int = 4096,
     effort: str | None = None,
+    response_format: dict[str, Any] | None = None,
 ) -> AgentCallResult:
     """Call an LLM and return the response.
 
@@ -122,6 +123,7 @@ async def call_agent(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 effort=effort,
+                response_format=response_format,
             )
     except Exception as e:
         duration_ms = (time.monotonic() - start) * 1000
@@ -245,6 +247,7 @@ def _call_litellm(
     temperature: float,
     max_tokens: int,
     effort: str | None = None,
+    response_format: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Synchronous LiteLLM call."""
     import litellm
@@ -273,20 +276,27 @@ def _call_litellm(
             "max_tokens": max_tokens,
             "timeout": 120,
         }
-        # Claude Fable 5 and newer Anthropic models don't support temperature
-        if provider != "anthropic":
+        # Anthropic adaptive-thinking and OpenAI GPT-5-family models use their
+        # provider defaults rather than accepting an explicit temperature.
+        base_model = model.split("/")[-1]
+        uses_provider_default_temperature = provider == "anthropic" or (
+            provider == "openai" and base_model.startswith("gpt-5")
+        )
+        if not uses_provider_default_temperature:
             kwargs["temperature"] = temperature
+
+        if response_format is not None:
+            kwargs["response_format"] = response_format
 
         # Anthropic adaptive thinking
         # Models that support effort in adaptive thinking:
-        #   claude-fable-5, claude-mythos-5, claude-opus-4-8, claude-opus-4-7, claude-sonnet-5
+        #   claude-fable-5, claude-mythos-5, claude-opus-4-8, claude-opus-4-7
         # Models that only support type:adaptive (no effort):
-        #   claude-opus-4-6, claude-sonnet-4-6
+        #   claude-opus-4-6, claude-sonnet-4-6, claude-sonnet-5
         if effort and provider == "anthropic":
             effort_models = {
                 "claude-fable-5", "claude-mythos-5",
                 "claude-opus-4-8", "claude-opus-4-7",
-                "claude-sonnet-5",
             }
             base = model.split("/")[-1]  # strip litellm prefix like "anthropic/"
             if base in effort_models:

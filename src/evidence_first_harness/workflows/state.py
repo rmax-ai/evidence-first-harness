@@ -6,7 +6,7 @@ Large outputs go to artifacts, not session state.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 # Updated 2026-07. Input + output prices from official provider pages.
 @dataclass(frozen=True)
 class ModelPricing:
+    """Per-million-token input and output pricing for one model."""
+
     input_per_mtok: float
     output_per_mtok: float
 
@@ -29,6 +31,8 @@ PRICING: dict[str, ModelPricing] = {
     "gemini-3.5-flash": ModelPricing(input_per_mtok=0.075, output_per_mtok=0.30),
     # DeepSeek
     "deepseek-chat":    ModelPricing(input_per_mtok=0.27,  output_per_mtok=1.10),
+    # OpenAI
+    "gpt-5.6-terra":   ModelPricing(input_per_mtok=2.50,  output_per_mtok=15.00),
 }
 
 
@@ -77,11 +81,13 @@ class WorkflowState(BaseModel):
     repository_id: str = ""
     base_commit: str = ""
     task_id: str = ""
+    task_description: str = ""
     workflow_status: str = "started"
     current_node: str = "start"
 
     # Artifact references (paths/IDs, not content)
     specification_artifact: str = ""
+    repository_context_artifact: str = ""
     risk_assessment_artifact: str = ""
     implementation_plan_artifact: str = ""
     patch_artifact: str = ""

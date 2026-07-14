@@ -48,7 +48,7 @@ Ensure all fields are present and correctly typed.
 """
 
 
-def create_specification_agent(model: str = "claude-opus-4-6") -> LlmAgent:
+def create_specification_agent(model: str = "claude-sonnet-5") -> LlmAgent:
     """Create the specification agent.
 
     Args:

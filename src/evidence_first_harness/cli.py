@@ -6,7 +6,10 @@ for initialization, inspection, execution, evidence review, and export.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
+import yaml
 
 from evidence_first_harness import __version__
 
@@ -41,13 +44,15 @@ def inspect(repo: str) -> None:
 @main.command()
 @click.option("--repo", default=".", help="Path to the repository")
 @click.option("--patch", "patch_path", default=None, help="Path to a patch file to evaluate")
+@click.option("--task", default=None, help="Natural-language implementation task")
 @click.option("--spec", default=None, help="Path to a YAML task specification")
-def run(repo: str, patch_path: str | None, spec: str | None) -> None:
+def run(repo: str, patch_path: str | None, task: str | None, spec: str | None) -> None:
     """Run the evidence-first workflow on a repository."""
     import asyncio
 
     from evidence_first_harness.workflows.session import SessionManager
 
+    task_description = _resolve_task_description(task, spec)
     click.echo(f"Evidence-First Harness — running on {repo}")
     if patch_path:
         click.echo(f"Evaluating patch: {patch_path}")
@@ -57,7 +62,7 @@ def run(repo: str, patch_path: str | None, spec: str | None) -> None:
     manager = SessionManager(repo_path=repo)
     result = asyncio.run(
         manager.run(
-            task_description=spec or "Evaluate existing patch",
+            task_description=task_description,
             patch_path=patch_path,
         )
     )
@@ -93,6 +98,26 @@ def run(repo: str, patch_path: str | None, spec: str | None) -> None:
         click.echo(f"\nErrors: {len(result['errors'])}")
         for err in result["errors"][:5]:
             click.echo(f"  - {err}")
+
+
+def _resolve_task_description(task: str | None, spec_path: str | None) -> str:
+    """Return one explicit task description without silently inventing one."""
+    if task and spec_path:
+        raise click.UsageError("Use either --task or --spec, not both.")
+    if task and task.strip():
+        return task.strip()
+    if spec_path:
+        try:
+            content = Path(spec_path).read_text(encoding="utf-8")
+        except OSError as error:
+            raise click.FileError(spec_path, hint=str(error)) from error
+        try:
+            if not yaml.safe_load(content):
+                raise click.UsageError("Task specification must not be empty.")
+        except yaml.YAMLError as error:
+            raise click.UsageError(f"Invalid YAML task specification: {error}") from error
+        return f"Task specification (YAML):\n{content.strip()}"
+    raise click.UsageError("Provide a concrete task with --task or --spec before running EFH.")
 
 
 @main.command()

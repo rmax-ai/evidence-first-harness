@@ -49,7 +49,7 @@
 
     <!-- Pricing -->
     <div>
-      <h3 class="text-[16px] leading-normal font-medium text-slate-300 mb-3 font-mono">[ Pricing — USD per 1M tokens, as of 2026-07-13 ]</h3>
+      <h3 class="text-[16px] leading-normal font-medium text-slate-300 mb-3 font-mono">[ Pricing — USD per 1M tokens, as of 2026-07-14 ]</h3>
       <div class="overflow-x-auto">
         <table class="w-full border border-slate-800 rounded-none font-mono text-xs">
           <thead>

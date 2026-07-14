@@ -32,7 +32,7 @@
   <!-- Impl -->
   <rect x="360" y="30" width="110" height="56" rx="4" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
   <text x="415" y="52" text-anchor="middle" fill="#e2e8f0" font-family="JetBrains Mono,monospace" font-size="10">Implementation</text>
-  <text x="415" y="68" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="8">DeepSeek</text>
+  <text x="415" y="68" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="8">GPT-5.6 Terra</text>
   <!-- Arrow -->
   <line x1="470" y1="58" x2="515" y2="58" stroke="#6366f1" stroke-width="1.5" marker-end="url(#arrow)"/>
 

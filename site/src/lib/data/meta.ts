@@ -1,6 +1,6 @@
 // Shared data for the Evidence-First Harness landing page.
 // Single source of truth — components import from here.
-// Pricing updated 2026-07-13 from official provider docs.
+// Pricing updated 2026-07-14 from official provider docs.
 
 export const PROJECT = {
   name: "Evidence-First Harness",
@@ -16,7 +16,7 @@ export const PRINCIPLE =
 export const PRICING_SOURCES: Record<string, string> = {
   anthropic: "https://docs.anthropic.com/en/docs/about-claude/pricing",
   anthropic_sonnet5: "https://www.anthropic.com/news/claude-sonnet-5",
-  deepseek: "https://api-docs.deepseek.com/quick_start/pricing",
+  openai: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
   gemini: "https://ai.google.dev/pricing",
 };
 
@@ -39,7 +39,7 @@ export const METRICS = [
   { label: "MIT", desc: "License", source: `${PROJECT.repo}/blob/main/LICENSE` },
   { label: "3/6", desc: "LLM agents live", source: `${PROJECT.repo}` },
   { label: "9", desc: "Evidence executors", source: `${PROJECT.repo}` },
-  { label: "~$0.11", desc: "Est. cost/run", source: `${PROJECT.repo}#smoke-test` },
+  { label: "~$0.128", desc: "Est. cost/run", source: `${PROJECT.repo}#smoke-test` },
   { label: "17", desc: "Workflow nodes", source: `${PROJECT.repo}` },
 ];
 
@@ -53,15 +53,15 @@ export interface AgentRow {
 }
 
 export const AGENT_ROUTING: AgentRow[] = [
-  { agent: "Specification", model: "claude-opus-4-6", provider: "Anthropic", live: true, inTokens: 294, outTokens: 4096 },
-  { agent: "Planner", model: "claude-sonnet-5", provider: "Anthropic", live: true, inTokens: 430, outTokens: 770 },
-  { agent: "Implementation", model: "deepseek-chat‡", provider: "DeepSeek", live: true, inTokens: 276, outTokens: 34 },
+  { agent: "Specification", model: "claude-sonnet-5", provider: "Anthropic", live: true, inTokens: 294, outTokens: 4096 },
+  { agent: "Planner", model: "claude-opus-4-6", provider: "Anthropic", live: true, inTokens: 430, outTokens: 770 },
+  { agent: "Implementation", model: "gpt-5.6-terra", provider: "OpenAI", live: true, inTokens: 276, outTokens: 34 },
   { agent: "Independent Test", model: "claude-haiku-4-5", provider: "Anthropic", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Adversarial Review", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
   { agent: "Explanation", model: "gemini-3.5-flash", provider: "Google", live: false, inTokens: 0, outTokens: 0 },
 ];
 
-export const AGENT_FOOTNOTE = "‡ deepseek-chat is a compatibility alias for deepseek-v4-flash. Alias deprecated 2026-07-24.";
+export const AGENT_FOOTNOTE = "Implementation proposals use strict JSON Schema Structured Outputs; the harness validates and applies the returned unified diff.";
 
 export interface PricingRow {
   model: string;
@@ -71,35 +71,35 @@ export interface PricingRow {
   source?: string;
 }
 
-// Pricing as of 2026-07-13. Sources: provider API pricing pages.
+// Pricing as of 2026-07-14. Sources: provider API pricing pages.
 export const PRICING: PricingRow[] = [
   {
     model: "claude-opus-4-6",
-    inputPrice: 5.00,
-    outputPrice: 25.00,
+    inputPrice: 15.00,
+    outputPrice: 75.00,
     note: "",
     source: PRICING_SOURCES.anthropic,
   },
   {
     model: "claude-sonnet-5",
-    inputPrice: 2.00,
-    outputPrice: 10.00,
-    note: "Introductory pricing through 2026-08-31. $3/$15 from 2026-09-01.",
+    inputPrice: 3.00,
+    outputPrice: 15.00,
+    note: "",
     source: PRICING_SOURCES.anthropic_sonnet5,
   },
   {
     model: "claude-haiku-4-5",
-    inputPrice: 1.00,
-    outputPrice: 5.00,
+    inputPrice: 0.80,
+    outputPrice: 4.00,
     note: "",
     source: PRICING_SOURCES.anthropic,
   },
   {
-    model: "deepseek-v4-flash",
-    inputPrice: 0.14,
-    outputPrice: 0.28,
-    note: "Cache-miss input; cache-hit is $0.0028. Alias: deepseek-chat until 2026-07-24.",
-    source: PRICING_SOURCES.deepseek,
+    model: "gpt-5.6-terra",
+    inputPrice: 2.50,
+    outputPrice: 15.00,
+    note: "Balanced GPT-5.6 model. Structured Outputs enabled for implementation proposals.",
+    source: PRICING_SOURCES.openai,
   },
   {
     model: "gemini-3.5-flash",
@@ -119,7 +119,7 @@ export interface BoundaryRow {
 export const BOUNDARY: BoundaryRow[] = [
   { component: "Specification agent", type: "llm", controls: "Interprets tasks, derives requirements" },
   { component: "Planner agent", type: "llm", controls: "Proposes implementation plan" },
-  { component: "Implementation agent", type: "llm", controls: "Generates code in sandbox" },
+  { component: "Implementation agent", type: "llm", controls: "Proposes a structured patch; harness validates and applies it" },
   { component: "Independent test agent", type: "llm", controls: "Generates additional tests (stubbed in alpha)" },
   { component: "Adversarial review agent", type: "llm", controls: "Identifies unsupported claims (stubbed in alpha)" },
   { component: "Explanation agent", type: "llm", controls: "Converts evidence to report (stubbed in alpha)" },
@@ -148,7 +148,10 @@ export const QUICK_START = [
   { cmd: "git clone https://github.com/rmax-ai/evidence-first-harness.git", desc: "Clone the repository" },
   { cmd: "cd evidence-first-harness && uv sync --extra dev", desc: "Install dependencies" },
   { cmd: "uv run pytest tests/ -q", desc: "Run 73 tests in ~4 seconds" },
-  { cmd: "uv run efh run --repo .", desc: "Full E2E smoke test (~90s)" },
+  {
+    cmd: 'uv run efh run --repo . --task "Add a focused test for the policy engine."',
+    desc: "Full E2E smoke test (~90s)",
+  },
 ];
 
 // Cost explanation shown below smoke output
@@ -161,20 +164,18 @@ export const SMOKE_CAVEAT =
   "not a guaranteed current API price.";
 
 export const COST_BREAKDOWN =
-  "Estimated run cost: approximately $0.1125 under current pricing assumptions as of 2026-07-13, " +
-  "using Sonnet 5 introductory pricing ($2/$10 per 1M tokens). " +
-  "Under standard Sonnet 5 pricing ($3/$15 from 2026-09-01), the estimate is $0.1170. " +
-  "These estimates exclude hidden/tool overhead and provider-side accounting differences. " +
-  "The cost in the transcript reflects the project's original pinned pricing assumptions.";
+  "Estimated run cost: approximately $0.1277 under current pricing assumptions as of 2026-07-15. " +
+  "This uses Sonnet 5 for specification, Opus 4.6 for planning, and GPT-5.6 Terra for implementation. " +
+  "These estimates exclude hidden/tool overhead and provider-side accounting differences.";
 
-export const SMOKE_OUTPUT = `$ efh run --repo .
+export const SMOKE_OUTPUT = `$ efh run --repo . --task "Add a focused test for the policy engine."
 
 workflow_started    run_id=run_3da28c6662d9
 worktree_created    base_commit=9007ebb1
 
-specification_agent_call   opus-4-6   in=294   out=4096
-planner_agent_call         sonnet-5   in=430   out=770
-implementation_agent_call  deepseek   in=276   out=34
+specification_agent_call   sonnet-5   in=294   out=4096
+planner_agent_call         opus-4-6   in=430   out=770
+implementation_agent_call  gpt-5.6-terra   in=276   out=34
 
 evidence_executed  formatting  ruff     fail
 evidence_executed  lint        ruff     fail
@@ -187,8 +188,8 @@ decision_rendered  decision=repair_required
 
 │ Agent              Model                  In    Out │
 ├──────────────────┼──────────────────┼──────┼──────┤
-│ specification      claude-opus-4-6       294   4096 │
-│ planner            claude-sonnet-5       430    770 │
-│ implementation     deepseek-chat         276     34 │
+│ specification      claude-sonnet-5       294   4096 │
+│ planner            claude-opus-4-6       430    770 │
+│ implementation     gpt-5.6-terra         276     34 │
 ├──────────────────┼──────────────────┼──────┼──────┤
 │ TOTAL                                   1000   4900 │`;

@@ -14,6 +14,7 @@ import structlog
 from evidence_first_harness.artifacts.store import ArtifactStore
 from evidence_first_harness.callbacks.provenance import ProvenanceRecorder
 from evidence_first_harness.domain.evidence import EvidenceRecord, EvidenceRequirement
+from evidence_first_harness.domain.exceptions import SpecificationError
 from evidence_first_harness.policy.decision import DecisionEngine
 from evidence_first_harness.policy.engine import PolicyEngine
 from evidence_first_harness.repository.git import RepositoryManager
@@ -86,13 +87,21 @@ class SessionManager:
         Returns:
             Dict with run_id, decision, and bundle path.
         """
+        normalized_task = task_description.strip()
+        if not normalized_task:
+            raise SpecificationError(
+                "A non-empty task description is required before starting a workflow. "
+                "Provide --task or --spec."
+            )
+        self._state.task_description = normalized_task
+
         self._provenance.record(
             actor_type="system",
             actor_id="session_manager",
             action="workflow_start",
             input_data={
                 "repo_path": str(self._repo_path),
-                "task_description": task_description[:200],
+                "task_description": normalized_task[:200],
                 "patch_path": str(patch_path) if patch_path else None,
             },
         )
@@ -211,7 +220,7 @@ class SessionManager:
                 self._state, self._repo_path, self._artifacts, self._provenance
             ),
             "compile_specification": lambda: handle_compile_specification(
-                self._state, "", self._artifacts, self._provenance
+                self._state, self._state.task_description, self._artifacts, self._provenance
             ),
             "classify_initial_risk": lambda: handle_classify_initial_risk(
                 self._state, self._artifacts, self._provenance

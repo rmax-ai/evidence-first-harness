@@ -26,13 +26,13 @@ git clone https://github.com/rmax-ai/evidence-first-harness.git
 cd evidence-first-harness
 uv sync --extra dev
 
-# Set API keys (only Anthropic + DeepSeek strictly required for 3 live agents)
+# Set API keys (Anthropic + OpenAI are required for the three live agents)
 export ANTHROPIC_API_KEY="sk-ant-..."
-export DEEPSEEK_API_KEY="sk-..."
-# Optional: OPENAI_API_KEY, GEMINI_API_KEY (adversarial/independent review stubs only)
+export OPENAI_API_KEY="sk-..."
+# Optional: GEMINI_API_KEY (adversarial/independent review stubs only)
 
 # Run the full evidence-first workflow on the harness repo itself
-uv run efh run --repo .
+uv run efh run --repo . --task "Add a focused test for the policy engine."
 ```
 
 You'll see the 17-node workflow with **real LLM calls, token counts, and USD costs**:
@@ -46,21 +46,21 @@ repository_loaded              commit=9007ebb1
 
 node_transition  start → load_repository
 node_transition  load_repository → compile_specification
-specification_agent_call  model=claude-opus-4-6  in=294  out=4096  cost_usd=0.311610
+specification_agent_call  model=claude-sonnet-5  in=294  out=4096  cost_usd=0.062322
 specification_compiled    artifact=art_e5ec1cf6  duration_ms=70276
 
 node_transition  compile_specification → classify_initial_risk
 node_transition  classify_initial_risk → validate_baseline
 node_transition  validate_baseline → plan_implementation
-planner_agent_call        model=claude-sonnet-5  in=430  out=770  cost_usd=0.012840
+planner_agent_call        model=claude-opus-4-6  in=430  out=770  cost_usd=0.064200
 node_executed             plan_implementation    duration_ms=18995
 
 node_transition  plan_implementation → generate_patch
-implementation_agent_call model=deepseek-chat    in=276  out=34   cost_usd=0.000112
+implementation_agent_call model=gpt-5.6-terra   in=276  out=34   cost_usd=0.001200
 node_executed             generate_patch         duration_ms=1991
 
 node_transition  generate_patch → analyze_impact
-impact_analyzed  affected_tests=0 changed_files=20 confidence=0.2
+impact_analyzed  affected_tests=0 changed_files=1 confidence=0.2
 
 node_transition  analyze_impact → reclassify_risk
 node_transition  reclassify_risk → compile_evidence_plan
@@ -93,15 +93,16 @@ Base commit: 9007ebb1
 
 │ Agent              Model                      In    Out Cost (USD) │
 ├──────────────────┼──────────────────────┼──────┼──────┼──────────┤
-│ specification      claude-opus-4-6           294   4096 $ 0.311610 │
-│ planner            claude-sonnet-5           430    770 $ 0.012840 │
-│ implementation     deepseek-chat             276     34 $ 0.000112 │
+│ specification      claude-sonnet-5           294   4096 $ 0.062322 │
+│ planner            claude-opus-4-6           430    770 $ 0.064200 │
+│ implementation     gpt-5.6-terra             276     34 $ 0.001200 │
 ├──────────────────┼──────────────────────┼──────┼──────┼──────────┤
-│ TOTAL                                       1000   4900 $ 0.324562 │
+│ TOTAL                                       1000   4900 $ 0.127722 │
 ```
 
-**What happened:** The LLM agents (Opus 4.6 spec, Sonnet 5 planner, DeepSeek impl)
-generated a patch proposal. Five deterministic evidence executors ran against it
+**What happened:** The LLM agents (Sonnet 5 spec, Opus 4.6 planner, GPT-5.6 Terra implementation)
+generated a structured patch proposal. The harness validates its JSON schema and applies the
+unified diff in an isolated worktree before five deterministic evidence executors run against it.
 (ruff, pyright, pytest, secret scan). The **deterministic decision engine** ruled
 `repair_required` because 4/5 mandatory checks failed. Total cost: **$0.32**.
 No LLM decided the outcome — only deterministic policy did.
@@ -110,16 +111,16 @@ No LLM decided the outcome — only deterministic policy did.
 
 | Agent | Model | Provider | Live? | Tokens² |
 |-------|-------|----------|-------|--------|
-| Specification | claude-opus-4-6 | Anthropic | ✅ Live | ~300/4096 |
-| Planner | claude-sonnet-5 | Anthropic | ✅ Live | ~400/800 |
-| Implementation | deepseek-chat | DeepSeek | ✅ Live | ~300/35 |
+| Specification | claude-sonnet-5 | Anthropic | ✅ Live | ~300/4096 |
+| Planner | claude-opus-4-6 | Anthropic | ✅ Live | ~400/800 |
+| Implementation | gpt-5.6-terra | OpenAI | ✅ Live | ~300/35 |
 | Independent Test | claude-haiku-4-5 | Anthropic | ⬜ Stub | 0/0 |
 | Adversarial Review | gemini-3.5-flash | Google | ⬜ Stub | 0/0 |
 | Explanation | gemini-3.5-flash | Google | ⬜ Stub | 0/0 |
 
 ² Typical per-run. Stubs return static advisory JSON — no LLM cost incurred.
 
-**Independence constraint:** Implementation model (DeepSeek) differs from all evaluator
+**Independence constraint:** Implementation model (OpenAI) differs from all evaluator
 models (Anthropic, Google). No model reviews its own output.
 
 ### Pricing (2026-07 USD per 1M tokens)
@@ -129,7 +130,7 @@ models (Anthropic, Google). No model reviews its own output.
 | claude-opus-4-6 | $15.00 | $75.00 |
 | claude-sonnet-5 | $3.00 | $15.00 |
 | claude-haiku-4-5 | $0.80 | $4.00 |
-| deepseek-chat | $0.27 | $1.10 |
+| gpt-5.6-terra | $2.50 | $15.00 |
 | gemini-3.5-flash | $0.075 | $0.30 |
 
 ## Architecture
@@ -152,7 +153,7 @@ acceptance thresholds, and the final decision are all implemented in determinist
 |-----------|------|----------|
 | Specification agent | LLM | Interprets tasks, derives requirements |
 | Planner agent | LLM | Proposes implementation plan |
-| Implementation agent | LLM | Generates code in sandbox |
+| Implementation agent | LLM | Proposes a structured patch; harness validates and applies it in the sandbox |
 | Independent test agent | LLM | Generates additional tests |
 | Adversarial review agent | LLM | Identifies unsupported claims |
 | Explanation agent | LLM | Converts evidence to human-readable report |
@@ -175,8 +176,8 @@ acceptance thresholds, and the final decision are all implemented in determinist
 
 ```bash
 efh init                  # Initialize EFH config in a repo
-efh run --repo .          # Run full evidence-first workflow
-efh run --repo . --patch patch.diff  # Evaluate an existing patch
+efh run --repo . --task "Describe the requested code change"  # Run workflow
+efh run --repo . --spec task.yaml  # Run a YAML task specification
 efh status --run-id <id>  # Show run status
 efh evidence show --run-id <id>  # View evidence bundle
 efh export --run-id <id>  # Export bundle to HTML/JSON
@@ -196,7 +197,7 @@ review burden compared with conventional coding-agent workflows?*
 ```bash
 uv sync --extra dev
 uv run pytest tests/ -q        # 73 tests, ~4s
-uv run efh run --repo .         # Full E2E (~90s, needs API keys)
+uv run efh run --repo . --task "Describe the requested code change"  # Full E2E
 ```
 
 ## License

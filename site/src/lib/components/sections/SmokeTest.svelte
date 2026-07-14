@@ -60,7 +60,7 @@
         <span>Pricing sources:</span>
         <a href={PRICING_SOURCES.anthropic} target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-400">Anthropic</a>
         <a href={PRICING_SOURCES.anthropic_sonnet5} target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-400">Sonnet 5</a>
-        <a href={PRICING_SOURCES.deepseek} target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-400">DeepSeek</a>
+        <a href={PRICING_SOURCES.openai} target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-400">OpenAI</a>
         <a href={PRICING_SOURCES.gemini} target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-400">Gemini</a>
       </div>
     </div>

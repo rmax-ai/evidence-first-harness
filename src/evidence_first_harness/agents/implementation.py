@@ -8,6 +8,7 @@ It must not approve its own patch.
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent
+from pydantic import BaseModel
 
 from evidence_first_harness.agents.tools import (
     inspect_repository,
@@ -18,25 +19,21 @@ from evidence_first_harness.agents.tools import (
 
 IMPLEMENTATION_AGENT_PROMPT = """You are an Implementation Agent for the Evidence-First Harness.
 
-Your role: implement the approved plan in an isolated Git worktree.
+Your role: propose a patch for the approved plan. The harness, not you, applies
+the patch in an isolated Git worktree.
 
 ## What you MUST do
 
 1. Read the specification and implementation plan.
-2. Inspect the repository to understand existing patterns.
-3. Implement changes file by file:
-   - Create new files with complete, working code.
-   - Modify existing files following the plan.
-   - Add or update tests as appropriate.
-4. Execute ONLY explicitly permitted development tools:
-   - run_allowed_command: run linters, formatters, type checkers, tests.
-5. Document any deviations from the plan.
+2. Use the repository context supplied in the request to follow existing patterns.
+3. Produce a complete unified Git diff for the requested changes, including
+   tests where appropriate.
+4. Document any deviations from the plan.
 
 ## What you MUST NOT do
 
 - Approve your own patch (the harness decides).
-- Execute arbitrary shell commands.
-- Modify files outside the worktree.
+- Execute commands or claim to have modified a worktree.
 - Access production credentials or external APIs.
 - Skip writing tests for changed code.
 
@@ -49,16 +46,33 @@ Your role: implement the approved plan in an isolated Git worktree.
 
 ## Output format
 
-Your output will be validated against the ImplementationResult Pydantic model.
-Include the patch content and any deviations from the plan.
+Return exactly one JSON object matching this schema, with no Markdown fences or
+surrounding prose:
+
+{
+  "patch": "complete unified diff beginning with diff --git",
+  "summary": "short description of the proposed change",
+  "deviations": ["optional deviations from the plan"]
+}
+
+The `patch` field must be directly applicable by `git apply`.
 """
 
 
-def create_implementation_agent(model: str = "deepseek-chat") -> LlmAgent:
+class ImplementationResult(BaseModel):
+    """Validated implementation proposal returned by the model."""
+
+    model_config = {"extra": "forbid", "frozen": True}
+
+    patch: str
+    summary: str
+    deviations: list[str]
+
+
+def create_implementation_agent(model: str = "gpt-5.6-terra") -> LlmAgent:
     """Create the implementation agent.
 
-    Uses DeepSeek by default (different model from spec/test agents
-    to reduce correlated failures).
+    Uses GPT-5.6 Terra by default for balanced patch generation.
     """
     return LlmAgent(
         name="implementation_agent",
