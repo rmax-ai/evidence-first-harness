@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -20,14 +21,18 @@ from evidence_first_harness.domain.evidence import (
     EvidenceRequirement,
 )
 from evidence_first_harness.domain.risk import RiskAssessment, RiskDimension
-from evidence_first_harness.domain.specification import CompiledSpecification
 from evidence_first_harness.evidence.bundle import BundleBuilder
 from evidence_first_harness.evidence.executors.base import EvidenceExecutionContext
+from evidence_first_harness.evidence.executors.composability import ComposabilityExecutor
 from evidence_first_harness.evidence.planner import EvidencePlanner
 from evidence_first_harness.impact.analyzer import ImpactAnalyzer
 from evidence_first_harness.policy.decision import DecisionEngine
 from evidence_first_harness.policy.engine import PolicyEngine
 from evidence_first_harness.repository.git import RepositoryManager
+
+if TYPE_CHECKING:
+    from evidence_first_harness.domain.specification import CompiledSpecification
+    from evidence_first_harness.evidence.executors.composability import ComposabilityCaseAdapter
 
 logger = structlog.get_logger()
 
@@ -35,22 +40,27 @@ logger = structlog.get_logger()
 class EvidenceRunner:
     """Orchestrates the evidence-first workflow for a single repository."""
 
+    _composability_adapter: ComposabilityCaseAdapter | None = None
+
     def __init__(
         self,
         repo_path: Path | str,
         policy_path: Path | str = "config/policies.yaml",
         artifact_dir: Path | str = ".artifacts",
+        composability_adapter: ComposabilityCaseAdapter | None = None,
     ) -> None:
         self._repo = RepositoryManager(repo_path)
         self._policy = PolicyEngine(policy_path)
         self._decision_engine = DecisionEngine()
         self._planner = EvidencePlanner(self._policy)
         self._artifacts = ArtifactStore(artifact_dir)
+        self._composability_adapter = composability_adapter
         self._run_id = f"run_{uuid.uuid4().hex[:12]}"
         self._provenance = ProvenanceRecorder(self._run_id, Path(artifact_dir) / "provenance")
 
     @property
     def run_id(self) -> str:
+        """Return this evaluation's unique identifier."""
         return self._run_id
 
     async def run_existing_patch(
@@ -88,7 +98,6 @@ class EvidenceRunner:
             # If patch provided, apply it to the worktree
             patch_commit = None
             if patch_path:
-                patch_content = Path(patch_path).read_text()
                 # Apply patch to worktree
                 import subprocess
 
@@ -118,7 +127,13 @@ class EvidenceRunner:
             )
 
             # Compile evidence plan
-            evidence_plan = self._planner.compile(risk=risk, impact=impact)
+            evidence_plan = self._planner.compile(
+                risk=risk,
+                impact=impact,
+                composability_claims=(
+                    specification.composability_claims if specification is not None else None
+                ),
+            )
 
             # Build execution context
             context = EvidenceExecutionContext(
@@ -309,6 +324,8 @@ class EvidenceRunner:
             executors.append(GitDiffExecutor())
         except ImportError:
             pass
+
+        executors.append(ComposabilityExecutor(self._composability_adapter))
 
         return executors
 

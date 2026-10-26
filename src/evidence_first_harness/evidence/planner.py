@@ -8,14 +8,18 @@ and independence classifications.
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
 from evidence_first_harness.domain.evidence import EvidenceRequirement
-from evidence_first_harness.domain.impact import ImpactReport
-from evidence_first_harness.domain.risk import RiskAssessment
-from evidence_first_harness.policy.engine import PolicyEngine
+
+if TYPE_CHECKING:
+    from evidence_first_harness.domain.composability import ComposabilityClaim
+    from evidence_first_harness.domain.impact import ImpactReport
+    from evidence_first_harness.domain.risk import RiskAssessment
+    from evidence_first_harness.policy.engine import PolicyEngine
 
 logger = structlog.get_logger()
 
@@ -35,6 +39,7 @@ class EvidencePlanner:
         risk: RiskAssessment,
         impact: ImpactReport | None = None,
         claim_ids: list[str] | None = None,
+        composability_claims: Sequence[ComposabilityClaim] | None = None,
     ) -> list[EvidenceRequirement]:
         """Compile an evidence plan for a given risk assessment.
 
@@ -42,6 +47,7 @@ class EvidencePlanner:
             risk: The risk assessment for the change.
             impact: Optional impact report (affects test selection strategy).
             claim_ids: Optional claim IDs to link requirements to.
+            composability_claims: Optional lifecycle claims selected by impact.
 
         Returns:
             Ordered list of evidence requirements.
@@ -56,7 +62,7 @@ class EvidencePlanner:
         ordered.extend(c for c in required_ids if c not in ordered)
 
         plan: list[EvidenceRequirement] = []
-        for i, check_id in enumerate(ordered):
+        for check_id in ordered:
             threshold = thresholds.get(check_id)
             independence = self._classify_independence(check_id)
             failure_action = self._classify_failure_action(check_id, tier)
@@ -74,6 +80,30 @@ class EvidencePlanner:
                 )
             )
 
+        selected_composability_claims: list[ComposabilityClaim] = []
+        if impact is not None and composability_claims:
+            affected_capabilities = set(impact.affected_capabilities)
+            affected_shapes = set(impact.change_shapes)
+            selected_composability_claims = [
+                claim
+                for claim in composability_claims
+                if claim.capability in affected_capabilities
+                and bool(set(claim.change_shapes) & affected_shapes)
+            ]
+            plan.extend(
+                EvidenceRequirement(
+                    id=f"composability_{claim.id}",
+                    claim_ids=[claim.id],
+                    evidence_type=f"composability:{claim.family}",
+                    executor="composability",
+                    mandatory=True,
+                    independence_class="deterministic",
+                    failure_action="reject",
+                    composability_claim=claim,
+                )
+                for claim in selected_composability_claims
+            )
+
         # If impact confidence is low, add broader testing
         if impact and impact.confidence < 0.70:
             logger.info(
@@ -88,6 +118,7 @@ class EvidencePlanner:
             tier=tier,
             check_count=len(plan),
             checks=[r.id for r in plan],
+            composability_claim_count=len(selected_composability_claims),
         )
 
         return plan

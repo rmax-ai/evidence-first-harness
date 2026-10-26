@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -16,11 +17,13 @@ from evidence_first_harness.domain.evidence import (
     EvidenceRecord,
     EvidenceRequirement,
 )
-from evidence_first_harness.domain.impact import ImpactReport
-from evidence_first_harness.domain.risk import RiskAssessment
-from evidence_first_harness.domain.specification import CompiledSpecification
-from evidence_first_harness.policy.decision import DecisionEngine
-from evidence_first_harness.policy.engine import PolicyEngine
+
+if TYPE_CHECKING:
+    from evidence_first_harness.domain.impact import ImpactReport
+    from evidence_first_harness.domain.risk import RiskAssessment
+    from evidence_first_harness.domain.specification import CompiledSpecification
+    from evidence_first_harness.policy.decision import DecisionEngine
+    from evidence_first_harness.policy.engine import PolicyEngine
 
 logger = structlog.get_logger()
 
@@ -93,6 +96,11 @@ class BundleBuilder:
             evidence_records=evidence_records,
             impact_confidence=impact_confidence,
             contradictions=contradictions,
+            additional_required_evidence_ids=[
+                requirement.id
+                for requirement in evidence_plan
+                if requirement.composability_claim is not None
+            ],
         )
 
         # Produce decision
@@ -190,6 +198,12 @@ class BundleBuilder:
                 <td>{record.metrics}</td>
             </tr>"""
 
+        limitations_html = (
+            "".join(f"<li>{lim}</li>" for lim in bundle.limitations)
+            if bundle.limitations
+            else "<li>None recorded</li>"
+        )
+
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,7 +211,14 @@ class BundleBuilder:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Evidence Bundle — {bundle.run_id}</title>
 <style>
-body {{ font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1a1a2e; background: #f8f9fa; }}
+body {{
+    font-family: system-ui, sans-serif;
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    color: #1a1a2e;
+    background: #f8f9fa;
+}}
 h1 {{ border-bottom: 2px solid #dee2e6; padding-bottom: 0.5rem; }}
 .meta {{ color: #6c757d; font-size: 0.9rem; }}
 table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; }}
@@ -209,7 +230,13 @@ th {{ background: #e9ecef; }}
 .unavailable {{ background: #e2e3e5; }}
 .status-pass {{ color: #155724; font-weight: bold; }}
 .status-fail {{ color: #721c24; font-weight: bold; }}
-.decision {{ font-size: 1.2rem; font-weight: bold; padding: 1rem; border-radius: 4px; margin: 1rem 0; }}
+.decision {{
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+}}
 .decision-eligible {{ background: #d4edda; color: #155724; }}
 .decision-rejected {{ background: #f8d7da; color: #721c24; }}
 .decision-review {{ background: #fff3cd; color: #856404; }}
@@ -218,7 +245,8 @@ th {{ background: #e9ecef; }}
 </head>
 <body>
 <h1>Evidence Bundle</h1>
-<p class="meta">Run: {bundle.run_id} | Repository: {bundle.repository} | Base: {bundle.base_commit[:8]}</p>
+<p class="meta">Run: {bundle.run_id} | Repository: {bundle.repository}
+| Base: {bundle.base_commit[:8]}</p>
 
 <h2>Decision</h2>
 <div class="decision decision-{decision}">
@@ -235,7 +263,7 @@ Decision: <strong>{decision.upper().replace("_", " ")}</strong>
 <h2>Limitations</h2>
 <div class="limitations">
 <ul>
-{"".join(f"<li>{lim}</li>" for lim in bundle.limitations) if bundle.limitations else "<li>None recorded</li>"}
+{limitations_html}
 </ul>
 </div>
 

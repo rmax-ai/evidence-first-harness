@@ -13,8 +13,8 @@ version-controlled policy — rather than accepting raw generated code.
 
 ## Status
 
-**Alpha (Phase 6 complete).** 85 tests, 3 of 6 agents wired with real LLM calls,
-17-node ADK workflow graph, 9 evidence executors, AST impact analysis,
+**Alpha (Phase 6 complete).** 99 tests, 3 of 6 agents wired with real LLM calls,
+17-node ADK workflow graph, 10 evidence executors, AST impact analysis,
 mutation testing, adversarial review stubs, GitHub Check Runs integration.
 Per-agent token tracking and USD cost reporting operational.
 
@@ -170,6 +170,12 @@ acceptance thresholds, and the final decision are all implemented in determinist
 | 3 (low risk) | formatting, lint, type check, targeted tests, secret scan | Automated |
 | 2 (medium) | + integration tests, security scan, mutation testing | Code owner |
 | 1 (high) | + contract tests, dependency scan, performance, rollback | Code owner + security owner |
+
+## Composability Verification
+
+EFH can plan deterministic lifecycle-property evidence for affected capabilities
+and change shapes. See [composability verification](docs/composability-verification.md)
+for the language-neutral claim families, adapter contract, and fixtures.
 
 ## All CLI Commands
 

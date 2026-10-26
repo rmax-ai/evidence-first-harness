@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from evidence_first_harness.domain.composability import ComposabilityClaim  # noqa: TC001
+
 
 class Requirement(BaseModel):
     """A single functional requirement derived from the task."""
@@ -51,4 +53,5 @@ class CompiledSpecification(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     ambiguities: list[str] = Field(default_factory=list)
     acceptance_properties: list[str] = Field(default_factory=list)
+    composability_claims: tuple[ComposabilityClaim, ...] = ()
     source_digest: str = Field(..., min_length=1, description="SHA-256 of the original task input")
