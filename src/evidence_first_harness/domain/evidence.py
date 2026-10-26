@@ -6,14 +6,14 @@ Sections 10.4, 10.5, 10.6 of the Evidence-First Harness specification.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:
-    from evidence_first_harness.domain.impact import ImpactReport
-    from evidence_first_harness.domain.risk import RiskAssessment
-    from evidence_first_harness.domain.specification import CompiledSpecification
+from evidence_first_harness.domain.composability import ComposabilityClaim  # noqa: TC001
+from evidence_first_harness.domain.impact import ImpactReport  # noqa: TC001
+from evidence_first_harness.domain.risk import RiskAssessment  # noqa: TC001
+from evidence_first_harness.domain.specification import CompiledSpecification  # noqa: TC001
 
 
 class EvidenceRequirement(BaseModel):
@@ -27,6 +27,7 @@ class EvidenceRequirement(BaseModel):
     executor: str = Field(..., min_length=1)
     mandatory: bool = True
     minimum_threshold: float | None = None
+    composability_claim: ComposabilityClaim | None = None
     independence_class: Literal[
         "external_oracle",
         "deterministic",
@@ -53,6 +54,7 @@ class EvidenceRecord(BaseModel):
     metrics: dict[str, float | int | str] = Field(default_factory=dict)
     artifact_ids: list[str] = Field(default_factory=list)
     artifact_digests: list[str] = Field(default_factory=list)
+    counterexample: str | None = None
     environment_digest: str = ""
     limitations: list[str] = Field(default_factory=list)
 

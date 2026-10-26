@@ -52,6 +52,7 @@ class PolicyEngine:
 
     @property
     def version(self) -> str:
+        """Return the policy version string."""
         return str(self._raw.get("version", "unknown"))
 
     def get_retry_policy(self) -> dict[str, int]:
@@ -162,6 +163,7 @@ class PolicyEngine:
         evidence_records: list[EvidenceRecord],
         impact_confidence: float = 0.0,
         contradictions: list[str] | None = None,
+        additional_required_evidence_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         """Evaluate whether collected evidence is sufficient.
 
@@ -172,6 +174,7 @@ class PolicyEngine:
             evidence_records: Collected evidence records.
             impact_confidence: Current impact confidence score.
             contradictions: Any detected contradictions.
+            additional_required_evidence_ids: Dynamically selected mandatory checks.
 
         Returns:
             Sufficiency assessment dict with 'passed', 'failed', 'unavailable',
@@ -179,6 +182,7 @@ class PolicyEngine:
         """
         thresholds = self.get_minimum_thresholds(tier)
         required_ids = set(self.get_required_evidence(tier))
+        required_ids.update(additional_required_evidence_ids or [])
         contradictions = contradictions or []
 
         records_by_id = {r.requirement_id: r for r in evidence_records}

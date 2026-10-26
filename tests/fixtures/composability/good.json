@@ -1,0 +1,160 @@
+[
+  {
+    "family": "temporal_cleanup",
+    "claim_id": "temporal-cleanup",
+    "component_id": "worker",
+    "explicitly_owned_state": [
+      {"state_id": "worker-lease", "component_id": "worker"}
+    ],
+    "state_after_removal": [
+      {"state_id": "platform-config", "component_id": "platform"}
+    ]
+  },
+  {
+    "family": "partial_activation_cleanup",
+    "claim_id": "partial-activation",
+    "events": [
+      {"action": "acquire", "resource_id": "worker-slot"},
+      {"action": "acquire", "resource_id": "worker-lease"},
+      {"action": "activation_failed"},
+      {"action": "release", "resource_id": "worker-lease"},
+      {"action": "release", "resource_id": "worker-slot"}
+    ],
+    "remaining_resources": []
+  },
+  {
+    "family": "dependency_reactivity",
+    "claim_id": "dependency-reactivity",
+    "changed_dependency_id": "catalog",
+    "dependency_value_before": "digest-v1",
+    "dependency_value_after": "digest-v2",
+    "propagation_window_ms": 100,
+    "dependent_observations": [
+      {
+        "component_id": "worker",
+        "dependency_ids": ["catalog"],
+        "value_before": "digest-v1",
+        "expected_value": "digest-v2",
+        "observed_value": "digest-v2",
+        "observed_after_ms": 80
+      }
+    ],
+    "non_dependent_observations": [
+      {
+        "component_id": "billing",
+        "dependency_ids": ["ledger"],
+        "value_before": "digest-stable",
+        "observed_value": "digest-stable"
+      }
+    ]
+  },
+  {
+    "family": "reconciliation_idempotence",
+    "claim_id": "reconciliation",
+    "state_after_once": [
+      {
+        "state_id": "desired-state",
+        "owner_id": "worker",
+        "value": "sha256:ready",
+        "value_type": "digest"
+      }
+    ],
+    "state_after_twice": [
+      {
+        "state_id": "desired-state",
+        "owner_id": "worker",
+        "value": "sha256:ready",
+        "value_type": "digest"
+      }
+    ]
+  },
+  {
+    "family": "convergence_permutation",
+    "claim_id": "convergence",
+    "expected_operations": ["set-a", "set-b"],
+    "runs": [
+      {
+        "operation_order": ["set-a", "set-b"],
+        "final_state": [
+          {
+            "state_id": "setting-a",
+            "owner_id": "worker",
+            "value": "sha256:a",
+            "value_type": "digest"
+          },
+          {
+            "state_id": "setting-b",
+            "owner_id": "worker",
+            "value": "sha256:b",
+            "value_type": "digest"
+          }
+        ]
+      },
+      {
+        "operation_order": ["set-b", "set-a"],
+        "final_state": [
+          {
+            "state_id": "setting-b",
+            "owner_id": "worker",
+            "value": "sha256:b",
+            "value_type": "digest"
+          },
+          {
+            "state_id": "setting-a",
+            "owner_id": "worker",
+            "value": "sha256:a",
+            "value_type": "digest"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "family": "interruption_resume",
+    "claim_id": "interruption",
+    "expected_effects": ["reserve", "publish", "record"],
+    "interruption_index": 1,
+    "applied_before_interruption": ["reserve"],
+    "resumed_effects": ["publish", "record"],
+    "terminal_effects": ["reserve", "publish", "record"]
+  },
+  {
+    "family": "unknown_external_outcome_duplicate_prevention",
+    "claim_id": "unknown-outcome",
+    "steps": [
+      "invoke",
+      "outcome_unknown",
+      "observe_absent",
+      "retry",
+      "confirmed_applied"
+    ]
+  },
+  {
+    "family": "ownership_isolation",
+    "claim_id": "ownership-isolation",
+    "component_id": "worker",
+    "operation": "removal",
+    "state_before": [
+      {
+        "state_id": "worker-lease",
+        "owner_id": "worker",
+        "value": "sha256:active",
+        "value_type": "digest"
+      },
+      {
+        "state_id": "platform-config",
+        "owner_id": "platform",
+        "value": "sha256:stable",
+        "value_type": "digest"
+      }
+    ],
+    "state_after": [
+      {
+        "state_id": "platform-config",
+        "owner_id": "platform",
+        "value": "sha256:stable",
+        "value_type": "digest"
+      }
+    ]
+  }
+]
